@@ -26,4 +26,7 @@ mod cpu {
             let self.programCounter = ProgramCounter(chip8Adrr);
         }
     }
+
+    fn emulateCPUCycle<C: CPU>(cpu: C) -> () {
+        cpu.emulateCycle();
 }

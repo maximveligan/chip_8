@@ -1,4 +1,17 @@
+mod cpu;
+mod ram;
+
 fn main() {
-    println!("Hello, world!");
+    let interpreter: Interpreter = 
+    ram.initialize();
+    cpu.initialize();
+    rom.load("path_to_rom")
+    startEmulator();
 }
 
+fn startEmulator() -> () {
+    loop {
+        emulateCPUCycle();
+        updateGPU();
+    }
+}
