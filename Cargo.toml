@@ -1,6 +1,0 @@
-[package]
-name = "chip_8"
-version = "0.1.0"
-authors = ["Maxim <maximveligan@gmail.com>"]
-
-[dependencies]
