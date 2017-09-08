@@ -91,8 +91,8 @@ fn decode_execute_op(opcode: u16) -> () {
         0x00EE => ret_subroutine(),
         _ => match (opcode & 0xF000) {
             0xF000 => match (opcode & 0x0060) {
-                0x0060 => load_vx_i(((opcode >> 8) << 4) as u8),
-                0x0050 => load_i_vx(((opcode >> 8) << 4) as u8),
+                0x0060 => load_vx_i(),
+                0x0050 => load_i_vx(),
                 0x0030 => load_b_vx(),
                 0x0020 => load_f_vx(),
                 0x0010 => match (opcode & 0x000e) {
@@ -155,11 +155,11 @@ fn ret_subroutine() -> () {
     unimplemented!();
 }
 
-fn load_vx_i(regAddress: u8) -> () {
+fn load_vx_i() -> () {
     unimplemented!();
 }
 
-fn load_i_vx(regAddress: u8) -> () {
+fn load_i_vx() -> () {
     unimplemented!();
 }
 
@@ -187,4 +187,10 @@ fn fetch_opcode_test() {
     ram.whole_bank[1] = 0xA2;
     assert_eq!(fetch_opcode(&registers.program_counter, &ram),0xFFA2);
 
+}
+
+#[test]
+#[should_panic]
+fn test_nybble() {
+    let nybble: Nybble = Nybble::new(0xFA);
 }
