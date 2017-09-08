@@ -2,6 +2,21 @@ struct Interpreter {
     registers: Registers,
 }
 
+struct Nybble(u8); 
+
+impl Nybble {
+    fn new(argument: u8 ) -> Self {
+        if ((argument & (0b11110000) != 0)) {
+            panic!("Invalid nybble value: {:X}", argument);
+        }
+        else {
+            Nybble {
+                0: argument,
+            }
+        }
+    }
+}
+
 struct Registers {
     programCounter: ProgramCounter,
     delay: u8,
@@ -48,9 +63,10 @@ impl ProgramCounter {
 }
 
 fn main() {
+    let test: Nybble = Nybble::new(0x0A);
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
-    loadRom("dev");
+//    loadRom("dev");
     decodeExecuteOpcode(fetchOpcode(&registers.programCounter, ram));
     registers.programCounter.updateCounter();
 }
@@ -60,7 +76,6 @@ fn loadRom(path: &str) -> () {
 }
 
 fn fetchOpcode(pc: &ProgramCounter, ram: Ram) -> u16 {
-
 //  TODO: implement slice references for u8    
     let leftByte: u8 = ram.wholeBank[pc.0 as usize];
     let rightByte: u8 = ram.wholeBank[(pc.0 + 1) as usize];
@@ -70,17 +85,17 @@ fn fetchOpcode(pc: &ProgramCounter, ram: Ram) -> u16 {
 fn decodeExecuteOpcode(opcode: u16) -> () {
 //  First check to see if opcode has operands
     match opcode {
-        0x00E0 => unimplemented!(),
-        0x00EE => unimplemented!(),
+        0x00E0 => clear_screen(),
+        0x00EE => ret_subroutine(),
         _ => match (opcode & 0xF000) {
             0xF000 => match (opcode & 0x0060) {
-                0x0060 => unimplemented!(),
-                0x0050 => unimplemented!(),
-                0x0030 => unimplemented!(),
-                0x0020 => unimplemented!(),
+                0x0060 => load_vx_i(((opcode >> 8) << 4) as u8),
+                0x0050 => load_i_vx(((opcode >> 8) << 4) as u8),
+                0x0030 => load_b_vx(),
+                0x0020 => load_f_vx(),
                 0x0010 => match (opcode & 0x000e) {
-                    0x000E => unimplemented!(),
-                    0x0008 => unimplemented!(),
+                    0x000E => add_i_vx(),
+                    0x0008 => load_sound_timer_vx(),
                     0x0005 => unimplemented!(),
                     _ => panic!("Unsupported or corrupt opcode"),
                     },
@@ -127,3 +142,39 @@ fn decodeExecuteOpcode(opcode: u16) -> () {
         }
     }
 }
+//fn extract_operand(opcode: u16) -> Nybble {
+//
+//}
+fn clear_screen() -> () {
+    unimplemented!();
+}
+
+fn ret_subroutine() -> () {
+    unimplemented!();
+}
+
+fn load_vx_i(regAddress: u8) -> () {
+    unimplemented!();
+}
+
+fn load_i_vx(regAddress: u8) -> () {
+    unimplemented!();
+}
+
+fn load_b_vx() -> () {
+    unimplemented!();
+}
+
+fn load_f_vx() -> () {
+    unimplemented!();
+}
+
+fn add_i_vx() -> () {
+    unimplemented!();
+}
+
+fn load_sound_timer_vx() -> () {
+    unimplemented!();
+}
+
+
