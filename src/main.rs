@@ -7,7 +7,7 @@ struct Nybble(u8);
 impl Nybble {
     fn new(argument: u8 ) -> Self {
         if ((argument & (0b11110000) != 0)) {
-            panic!("Invalid nybble value: {:X}", argument);
+            panic!("Invalid nybble value: {:X}. Did your nybble get parsed in correctly?", argument);
         }
         else {
             Nybble {
@@ -18,7 +18,7 @@ impl Nybble {
 }
 
 struct Registers {
-    programCounter: ProgramCounter,
+    program_counter: ProgramCounter,
     delay: u8,
     sound: u8,
     flag: u8,
@@ -31,7 +31,7 @@ impl Registers {
     fn new() -> Registers {
         let chip8Adrr = 0x200;
         Registers {
-            programCounter: ProgramCounter(chip8Adrr),
+            program_counter: ProgramCounter(chip8Adrr),
             delay: 0,
             sound: 0,
             flag: 0,
@@ -43,13 +43,13 @@ impl Registers {
 }
 
 struct Ram {
-    wholeBank: [u8; 0xFFF],
+    whole_bank: [u8; 0xFFF],
 }
 
 impl Ram {
     fn new() -> Ram {
         Ram {
-           wholeBank:  [0; 0xFFF],
+           whole_bank:  [0; 0xFFF],
         }
     }
 }
@@ -57,32 +57,34 @@ impl Ram {
 struct ProgramCounter(u8);
 
 impl ProgramCounter {
-    fn updateCounter(&mut self){
+    fn update_counter(&mut self){
         self.0+=2;
     }
 }
 
 fn main() {
-    let test: Nybble = Nybble::new(0x0A);
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
-//    loadRom("dev");
-    decodeExecuteOpcode(fetchOpcode(&registers.programCounter, ram));
-    registers.programCounter.updateCounter();
+    load_rom("dev");
+    loop {
+        decode_execute_op(
+        fetch_opcode(&registers.program_counter, &ram));
+        registers.program_counter.update_counter();
+    }
 }
 
-fn loadRom(path: &str) -> () {
+fn load_rom(path: &str) -> () {
     unimplemented!();
 }
 
-fn fetchOpcode(pc: &ProgramCounter, ram: Ram) -> u16 {
+fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 //  TODO: implement slice references for u8    
-    let leftByte: u8 = ram.wholeBank[pc.0 as usize];
-    let rightByte: u8 = ram.wholeBank[(pc.0 + 1) as usize];
-    (((leftByte as u16) << 8) | (rightByte as u16))
+    let left_byte: u8 = ram.whole_bank[pc.0 as usize];
+    let right_byte: u8 = ram.whole_bank[(pc.0 + 1) as usize];
+    (((left_byte as u16) << 8) | (right_byte as u16))
 }
 
-fn decodeExecuteOpcode(opcode: u16) -> () {
+fn decode_execute_op(opcode: u16) -> () {
 //  First check to see if opcode has operands
     match opcode {
         0x00E0 => clear_screen(),
@@ -177,4 +179,12 @@ fn load_sound_timer_vx() -> () {
     unimplemented!();
 }
 
+#[test]
+fn fetch_opcode_test() {
+    let mut ram: Ram = Ram::new();
+    let registers: Registers = Registers::new();
+    ram.whole_bank[0] = 0xFF;
+    ram.whole_bank[1] = 0xA2;
+    assert_eq!(fetch_opcode(&registers.program_counter, &ram),0xFFA2);
 
+}
