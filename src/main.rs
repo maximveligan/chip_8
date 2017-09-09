@@ -178,6 +178,10 @@ fn load_sound_timer_vx() -> () {
     unimplemented!();
 }
 
+fn se_vx_byte() -> () {
+    unimplemented!();
+}
+
 #[test]
 fn fetch_opcode_test() {
     let mut ram: Ram = Ram::new();
