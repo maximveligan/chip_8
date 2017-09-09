@@ -87,59 +87,58 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 fn decode_execute_op(opcode: u16) -> () {
 //  First check to see if opcode has operands
     match opcode {
-        0x00E0 => clear_screen(),
-        0x00EE => ret_subroutine(),
+        0x00E0 => println!("Got to opcode {:X}", opcode),
+        0x00EE => println!("Got to opcode {:X}", opcode),
         _ => match (opcode & 0xF000) {
-            0xF000 => match (opcode & 0x0060) {
-                0x0060 => load_vx_i(),
-                0x0050 => load_i_vx(),
-                0x0030 => load_b_vx(),
-                0x0020 => load_f_vx(),
-                0x0010 => match (opcode & 0x000e) {
-                    0x000E => add_i_vx(),
-                    0x0008 => load_sound_timer_vx(),
-                    0x0005 => unimplemented!(),
+            0xF000 => match (opcode & 0x00F0) {
+                0x0060 => println!("Got to opcode {:X}", opcode),
+                0x0050 => println!("Got to opcode {:X}", opcode), 
+                0x0030 => println!("Got to opcode {:X}", opcode), 
+                0x0020 => println!("Got to opcode {:X}", opcode), 
+                0x0010 => match (opcode & 0x000F) {
+                    0x000E => println!("Got to opcode {:X}", opcode), 
+                    0x0008 => println!("Got to opcode {:X}", opcode), 
+                    0x0005 => println!("Got to opcode {:X}", opcode), 
                     _ => panic!("Unsupported or corrupt opcode"),
                     },
-                0x0000 => match (opcode & 0x000A) {
-                    0x000A => unimplemented!(),
-                    0x0007 => unimplemented!(),
-                    0x0001 => unimplemented!(),
+                0x0000 => match (opcode & 0x000F) {
+                    0x000A => println!("Got to opcode {:X}", opcode), 
+                    0x0007 => println!("Got to opcode {:X}", opcode), 
+                    0x0001 => println!("Got to opcode {:X}", opcode), 
                     _ => panic!("Unsupported or corrupt opcode"),
                     },
                 _ => panic!("Unsupported or corrupt opcode"),
             },
-            0xE000 => match (opcode & 0x00A0) {
-                0x00A0 => unimplemented!(),
-                0x0090 => unimplemented!(),
+            0xE000 => match (opcode & 0x00F0) {
+                0x00A0 => println!("Got to opcode {:X}", opcode), 
+                0x0090 => println!("Got to opcode {:X}", opcode), 
                 _ => panic!("unsupported or Corrupt opcode"),
             },
-            0xD000 => unimplemented!(),
-            0xC000 => unimplemented!(),
-            0xB000 => unimplemented!(),
-            0xA000 => unimplemented!(),
-            0x9000 => unimplemented!(),
+            0xD000 => println!("Got to opcode {:X}", opcode), 
+            0xC000 => println!("Got to opcode {:X}", opcode), 
+            0xB000 => println!("Got to opcode {:X}", opcode), 
+            0xA000 => println!("Got to opcode {:X}", opcode), 
+            0x9000 => println!("Got to opcode {:X}", opcode), 
             0x8000 => match (opcode & 0x000E) {
-                0x000E => unimplemented!(),
-                0x0007 => unimplemented!(),
-                0x0006 => unimplemented!(),
-                0x0005 => unimplemented!(),
-                0x0004 => unimplemented!(),
-                0x0003 => unimplemented!(),
-                0x0002 => unimplemented!(),
-                0x0001 => unimplemented!(),
-                0x0000 => unimplemented!(),
+                0x000E => println!("Got to opcode {:X}", opcode), 
+                0x0007 => println!("Got to opcode {:X}", opcode), 
+                0x0006 => println!("Got to opcode {:X}", opcode), 
+                0x0005 => println!("Got to opcode {:X}", opcode), 
+                0x0004 => println!("Got to opcode {:X}", opcode), 
+                0x0003 => println!("Got to opcode {:X}", opcode), 
+                0x0002 => println!("Got to opcode {:X}", opcode), 
+                0x0001 => println!("Got to opcode {:X}", opcode), 
+                0x0000 => println!("Got to opcode {:X}", opcode), 
                 _ => panic!("Unsupported or corrupt opcode"),
             },
-            0x7000 => unimplemented!(),
-            0x8000 => unimplemented!(),
-            0x6000 => unimplemented!(),
-            0x5000 => unimplemented!(),
-            0x4000 => unimplemented!(),
-            0x3000 => unimplemented!(),
-            0x2000 => unimplemented!(),
-            0x1000 => unimplemented!(),
-            0x0000 => unimplemented!(),
+            0x7000 => println!("Got to opcode {:X}", opcode),
+            0x6000 => println!("Got to opcode {:X}", opcode),
+            0x5000 => println!("Got to opcode {:X}", opcode),
+            0x4000 => println!("Got to opcode {:X}", opcode),
+            0x3000 => println!("Got to opcode {:X}", opcode),
+            0x2000 => println!("Got to opcode {:X}", opcode),
+            0x1000 => println!("Got to opcode {:X}", opcode),
+            0x0000 => println!("Got to opcode {:X}", opcode),
             _ => panic!("Unsupported or corrupt opcode"),
         }
     }
@@ -194,3 +193,25 @@ fn fetch_opcode_test() {
 fn test_nybble() {
     let nybble: Nybble = Nybble::new(0xFA);
 }
+
+#[test]
+fn test_decode_execute_op() {
+    let mut ram: Ram = Ram::new();
+    let mut registers: Registers = Registers::new();
+    let test_ops: [u8; 70] = [0x05, 0x55, 0x00, 0xE0, 0x00, 0xEE, 0x15, 0x55, 0x25, 0x55, 0x31, 0x33, 0x41, 0x33, 0x56, 0x70, 0x61, 0x33, 0x71, 0x33, 0x86, 0x70, 0x86, 0x71, 0x86, 0x72, 0x86, 0x73, 0x86, 0x74, 0x86, 0x75, 0x86, 0x76, 0x86, 0x77, 0x86, 0x7E, 0x96, 0x70, 0xA5, 0x55, 0xB5, 0x55, 0xC1, 0x33, 0xD6, 0x75, 0xE1, 0x9E, 0xE1, 0xA1, 0xF1, 0x07, 0xF1, 0x0A, 0xF1, 0x15, 0xF1, 0x18, 0xF1, 0x1E, 0xF1, 0x29, 0xF1, 0x33, 0xF1, 0x55, 0xF1, 0x65];
+    let mut x = 0;
+    for element in test_ops.iter() {
+        ram.whole_bank[x] = *element;
+        x+=1;
+    }
+    loop {
+        decode_execute_op(fetch_opcode(&registers.program_counter, &ram));
+        registers.program_counter.update_counter();
+        if (registers.program_counter.0 == 70) {
+            break;
+        }
+    }
+}
+
+
+
