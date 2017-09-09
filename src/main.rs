@@ -270,7 +270,7 @@ fn skip_p_vx() -> () {
 
 // skip next instruction if key with the value vx is not pressed
 fn skip_np_vx() -> () {
-    unimeplemented!();
+    unimplemented!();
 }
 
 //set vx to delay timer value
