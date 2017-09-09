@@ -229,6 +229,18 @@ fn test_decode_execute_op() {
     }
 }
 
+#[test]
+fn test_rom_loader() {
+    panic!();
+}
 
+#[test]
+#[should_panic]
+fn test_wrong_rom_path() {
+}
 
-//Testing -Jason
+#[test]
+fn test_rom_ram_loader() {
+    panic!();
+}
+
