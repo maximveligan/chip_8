@@ -179,7 +179,7 @@ fn load_sound_timer_vx() -> () {
 }
 
 fn se_vx_byte() -> () {
-    implemented!();
+    unimplemented!();
 }
 
 #[test]
