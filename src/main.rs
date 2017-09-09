@@ -2,7 +2,7 @@ struct Interpreter {
     registers: Registers,
 }
 
-struct Nybble(u8); 
+struct Nybble(u8);
 
 impl Nybble {
     fn new(argument: u8 ) -> Self {
@@ -78,7 +78,7 @@ fn load_rom(path: &str) -> () {
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
-//  TODO: implement slice references for u8    
+//  TODO: implement slice references for u8
     let left_byte: u8 = ram.whole_bank[pc.0 as usize];
     let right_byte: u8 = ram.whole_bank[(pc.0 + 1) as usize];
     (((left_byte as u16) << 8) | (right_byte as u16))
@@ -92,43 +92,43 @@ fn decode_execute_op(opcode: u16) -> () {
         _ => match (opcode & 0xF000) {
             0xF000 => match (opcode & 0x00F0) {
                 0x0060 => println!("Got to opcode {:X}", opcode),
-                0x0050 => println!("Got to opcode {:X}", opcode), 
-                0x0030 => println!("Got to opcode {:X}", opcode), 
-                0x0020 => println!("Got to opcode {:X}", opcode), 
+                0x0050 => println!("Got to opcode {:X}", opcode),
+                0x0030 => println!("Got to opcode {:X}", opcode),
+                0x0020 => println!("Got to opcode {:X}", opcode),
                 0x0010 => match (opcode & 0x000F) {
-                    0x000E => println!("Got to opcode {:X}", opcode), 
-                    0x0008 => println!("Got to opcode {:X}", opcode), 
-                    0x0005 => println!("Got to opcode {:X}", opcode), 
+                    0x000E => println!("Got to opcode {:X}", opcode),
+                    0x0008 => println!("Got to opcode {:X}", opcode),
+                    0x0005 => println!("Got to opcode {:X}", opcode),
                     _ => panic!("Unsupported or corrupt opcode"),
                     },
                 0x0000 => match (opcode & 0x000F) {
-                    0x000A => println!("Got to opcode {:X}", opcode), 
-                    0x0007 => println!("Got to opcode {:X}", opcode), 
-                    0x0001 => println!("Got to opcode {:X}", opcode), 
+                    0x000A => println!("Got to opcode {:X}", opcode),
+                    0x0007 => println!("Got to opcode {:X}", opcode),
+                    0x0001 => println!("Got to opcode {:X}", opcode),
                     _ => panic!("Unsupported or corrupt opcode"),
                     },
                 _ => panic!("Unsupported or corrupt opcode"),
             },
             0xE000 => match (opcode & 0x00F0) {
-                0x00A0 => println!("Got to opcode {:X}", opcode), 
-                0x0090 => println!("Got to opcode {:X}", opcode), 
+                0x00A0 => println!("Got to opcode {:X}", opcode),
+                0x0090 => println!("Got to opcode {:X}", opcode),
                 _ => panic!("unsupported or Corrupt opcode"),
             },
-            0xD000 => println!("Got to opcode {:X}", opcode), 
-            0xC000 => println!("Got to opcode {:X}", opcode), 
-            0xB000 => println!("Got to opcode {:X}", opcode), 
-            0xA000 => println!("Got to opcode {:X}", opcode), 
-            0x9000 => println!("Got to opcode {:X}", opcode), 
+            0xD000 => println!("Got to opcode {:X}", opcode),
+            0xC000 => println!("Got to opcode {:X}", opcode),
+            0xB000 => println!("Got to opcode {:X}", opcode),
+            0xA000 => println!("Got to opcode {:X}", opcode),
+            0x9000 => println!("Got to opcode {:X}", opcode),
             0x8000 => match (opcode & 0x000E) {
-                0x000E => println!("Got to opcode {:X}", opcode), 
-                0x0007 => println!("Got to opcode {:X}", opcode), 
-                0x0006 => println!("Got to opcode {:X}", opcode), 
-                0x0005 => println!("Got to opcode {:X}", opcode), 
-                0x0004 => println!("Got to opcode {:X}", opcode), 
-                0x0003 => println!("Got to opcode {:X}", opcode), 
-                0x0002 => println!("Got to opcode {:X}", opcode), 
-                0x0001 => println!("Got to opcode {:X}", opcode), 
-                0x0000 => println!("Got to opcode {:X}", opcode), 
+                0x000E => println!("Got to opcode {:X}", opcode),
+                0x0007 => println!("Got to opcode {:X}", opcode),
+                0x0006 => println!("Got to opcode {:X}", opcode),
+                0x0005 => println!("Got to opcode {:X}", opcode),
+                0x0004 => println!("Got to opcode {:X}", opcode),
+                0x0003 => println!("Got to opcode {:X}", opcode),
+                0x0002 => println!("Got to opcode {:X}", opcode),
+                0x0001 => println!("Got to opcode {:X}", opcode),
+                0x0000 => println!("Got to opcode {:X}", opcode),
                 _ => panic!("Unsupported or corrupt opcode"),
             },
             0x7000 => println!("Got to opcode {:X}", opcode),
@@ -215,3 +215,4 @@ fn test_decode_execute_op() {
 
 
 
+//Testing -Jason
