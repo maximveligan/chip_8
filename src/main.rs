@@ -1,6 +1,13 @@
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 struct Interpreter {
     registers: Registers,
 }
+
+struct Rom(File);
 
 struct Nybble(u8);
 
@@ -73,8 +80,13 @@ fn main() {
     }
 }
 
-fn load_rom(path: &str) -> () {
-    unimplemented!();
+fn load_rom(folder: &str) -> Rom {
+    let path = Path::new(folder);
+    let display = path.display();
+    Rom(match File::open(&path) {
+        Err(why) => panic!("Couldn't open {}: {}", display, why.description()),
+        Ok(rom) => rom,
+        })
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
