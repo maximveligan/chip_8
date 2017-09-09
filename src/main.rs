@@ -182,6 +182,9 @@ fn se_vx_byte() -> () {
     unimplemented!();
 }
 
+fn sne_vx_byte() -> () {
+    unimplemented!();
+}
 #[test]
 fn fetch_opcode_test() {
     let mut ram: Ram = Ram::new();
