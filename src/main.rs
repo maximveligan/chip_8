@@ -97,7 +97,6 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 }
 
 fn decode_execute_op(opcode: u16) -> () {
-//  First check to see if opcode has operands
     match opcode {
         0x00E0 => println!("Got to opcode {:X}", opcode),
         0x00EE => println!("Got to opcode {:X}", opcode),
@@ -158,6 +157,7 @@ fn decode_execute_op(opcode: u16) -> () {
 //fn extract_operand(opcode: u16) -> Nybble {
 //
 //}
+
 fn clear_screen() -> () {
     unimplemented!();
 }
@@ -166,31 +166,164 @@ fn ret_subroutine() -> () {
     unimplemented!();
 }
 
-fn load_vx_i() -> () {
+fn sys_address_nnn() -> () {
     unimplemented!();
 }
 
-fn load_i_vx() -> () {
+fn jump_addr_nnn() -> () {
     unimplemented!();
 }
 
-fn load_b_vx() -> () {
+fn call_addr_nnn() -> () {
     unimplemented!();
 }
 
-fn load_f_vx() -> () {
+fn load_i_addr() -> () {
     unimplemented!();
 }
 
+fn jump_v0_addr_nnn() -> () {
+    unimplemented!();
+}
+
+//skips next instruction if vx == kk
+fn skip_e_vx_byte() -> () {
+    unimplemented!();
+}
+
+//skips next instruction if vx != kk
+fn skip_ne_vx_byte() -> () {
+    unimplemented!();
+}
+
+//skip next instruction if vx == vy
+fn skip_e_vx_vy() -> () {
+    unimplemented!();
+}
+
+//skip next instruction if vx == kk
+fn load_vx_byte() -> () {
+    unimplemented!();
+}
+
+//set vx = vx + kk
+fn add_vx_byte() -> () {
+    unimplemented!();
+}
+
+//set vx = vy
+fn load_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx or vy
+fn or_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx and vy
+fn and_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx xor vy
+fn xor_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx + vy, set fv = carry
+fn add_vx_vy_ld_vf() -> () {
+    unimplemented!();
+}
+
+//set vx = vx - vy, set fv = not borrow
+fn subtract_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx shr 1
+fn shift_r_vx_vy() -> () {
+    unimplemented!();
+}
+
+
+//set vx = vx - vy, set vf = not borrow
+fn subtract_n_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = vx shl 1
+fn shift_l_vx_vy() -> () {
+    unimplemented!();
+}
+
+//skip next instruction if vx != vy
+fn skip_ne_vx_vy() -> () {
+    unimplemented!();
+}
+
+//set vx = random byte and kk
+fn random_vx_byte() -> () {
+    unimplemented!();
+}
+
+//display n-byte sprite starting at memory location (vx, vy) set vf = collision
+fn draw_vx_vy_nibble() -> () {
+    unimplemented!();
+}
+
+//skip next instruction if key with the value vx is pressed
+fn skip_p_vx() -> () {
+    unimplemented!();
+}
+
+// skip next instruction if key with the value vx is not pressed
+fn skip_np_vx() -> () {
+    unimplemented!();
+}
+
+//set vx to delay timer value
+fn load_vx_dt() -> () {
+    unimplemented!();
+}
+
+//wait for key press, store the value of the key in vx
+fn load_vx_k() -> () {
+    unimplemented!();
+}
+
+//set delay timer = vx
+fn load_dt_vx() -> () {
+    unimplemented!();
+}
+
+//set sound timer = vx
+fn load_st_vx() -> () {
+    unimplemented!();
+}
+
+//set i = i + vx
 fn add_i_vx() -> () {
     unimplemented!();
 }
 
-fn load_sound_timer_vx() -> () {
+//set i = location of sprite for digit vx
+fn loadf_vx() {
     unimplemented!();
 }
 
-fn se_vx_byte() -> () {
+//store bcd representation of vx in memory location i, i+1, i+2
+fn loadb_vx() {
+    unimplemented!();
+}
+
+//stores registers v0 through vx in memory starting at location i
+fn store_vx_starting_at_i() -> () {
+    unimplemented!();
+}
+
+//read registers v0 through vx in memory starting at location i
+fn read_vx_starting_at_i() -> () {
     unimplemented!();
 }
 
