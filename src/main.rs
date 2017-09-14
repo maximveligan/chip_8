@@ -167,93 +167,93 @@ fn decode_execute_op(opcode: u16) -> () {
 //
 //}
 
-fn clear_screen() -> () {
+fn clear_screen() {
     unimplemented!();
 }
 
-fn ret_subroutine() -> () {
+fn ret_subroutine() {
     unimplemented!();
 }
 
-fn sys_address_nnn() -> () {
+fn sys_address_nnn() {
     unimplemented!();
 }
 
-fn jump_addr_nnn() -> () {
+fn jump_addr_nnn() {
     unimplemented!();
 }
 
-fn call_addr_nnn() -> () {
+fn call_addr_nnn() {
     unimplemented!();
 }
 
-fn load_i_addr() -> () {
+fn load_i_addr() {
     unimplemented!();
 }
 
-fn jump_v0_addr_nnn() -> () {
+fn jump_v0_addr_nnn() {
     unimplemented!();
 }
 
 //skips next instruction if vx == kk
-fn skip_e_vx_byte() -> () {
+fn skip_e_vx_byte() {
     unimplemented!();
 }
 
 //skips next instruction if vx != kk
-fn skip_ne_vx_byte() -> () {
+fn skip_ne_vx_byte() {
     unimplemented!();
 }
 
 //skip next instruction if vx == vy
-fn skip_e_vx_vy() -> () {
+fn skip_e_vx_vy() {
     unimplemented!();
 }
 
 //skip next instruction if vx == kk
-fn load_vx_byte() -> () {
+fn load_vx_byte() {
     unimplemented!();
 }
 
 //set vx = vx + kk
-fn add_vx_byte() -> () {
+fn add_vx_byte() {
     unimplemented!();
 }
 
 //set vx = vy
-fn load_vx_vy() -> () {
+fn load_vx_vy() {
     unimplemented!();
 }
 
 //set vx = vx or vy
-fn or_vx_vy() -> () {
+fn or_vx_vy() {
     unimplemented!();
 }
 
 //set vx = vx and vy
-fn and_vx_vy() -> () {
+fn and_vx_vy() {
     unimplemented!();
 }
 
 //set vx = vx xor vy
-fn xor_vx_vy() -> () {
+fn xor_vx_vy() {
     unimplemented!();
 }
 
 //set vx = vx + vy, set fv = carry
-fn add_vx_vy_ld_vf() -> () {
+fn add_vx_vy_ld_vf() {
     unimplemented!();
 }
 
 //set vx = vx - vy, set fv = not borrow
-fn subtract_vx_vy() -> () {
+fn subtract_vx_vy() {
     unimplemented!();
 }
 
 //set vx = vx shr 1
-fn shift_r_vx_vy() -> () {
+fn shift_r_vx_vy() {
     unimplemented!();
-}
+    }
 
 
 //set vx = vx - vy, set vf = not borrow
