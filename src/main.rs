@@ -7,8 +7,6 @@ struct Interpreter {
     registers: Registers,
 }
 
-struct Rom(File);
-
 struct Nybble(u8);
 
 impl Nybble {
@@ -31,7 +29,7 @@ struct Registers {
     flag: u8,
     stackPointer: u8,
     iRegister: u16,
-    vRegisters: [u8; 15],
+    v_registers: [u8; 15],
 }
 
 impl Registers {
@@ -44,18 +42,16 @@ impl Registers {
             flag: 0,
             iRegister: 0,
             stackPointer: 0,
-            vRegisters: [0; 15],
+            v_registers: [0; 15],
         }
     }
 }
 
-struct Ram {
-    whole_bank: [u8; 0xFFF],
-}
+struct Ram([u8; 0xFFF]); 
 
 impl Ram {
     fn new() -> Ram {
-        Ram { whole_bank: [0; 0xFFF] }
+        Ram { 0: [0; 0xFFF] }
     }
 }
 
@@ -77,19 +73,21 @@ fn main() {
     }
 }
 
-fn load_rom(folder: &str) -> Rom {
-    let path = Path::new(folder);
-    let display = path.display();
-    Rom(match File::open(&path) {
-        Err(why) => panic!("Couldn't open {}: {}", display, why.description()),
-        Ok(rom) => rom,
-        })
+fn load_rom(file: &str) -> Vec<u8> {
+    let mut rom = File::open(file).expect("Rom not found");
+    let mut raw_bytes = Vec::new();
+    rom.read_to_end(&mut raw_bytes).expect("Something went wrong while reading the rom");
+    raw_bytes
+}
+
+fn load_rom_into_mem(bytes: Vec<u8>, ram: &mut Ram) {
+   &ram.0[0x200 .. 0xFFF].copy_from_slice(&bytes); 
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     //  TODO: implement slice references for u8
-    let left_byte: u8 = ram.whole_bank[pc.0 as usize];
-    let right_byte: u8 = ram.whole_bank[(pc.0 + 1) as usize];
+    let left_byte: u8 = ram.0[pc.0 as usize];
+    let right_byte: u8 = ram.0[(pc.0 + 1) as usize];
     (((left_byte as u16) << 8) | (right_byte as u16))
 }
 
@@ -340,8 +338,8 @@ fn read_vx_starting_at_i() -> () {
 fn fetch_opcode_test() {
     let mut ram: Ram = Ram::new();
     let registers: Registers = Registers::new();
-    ram.whole_bank[0] = 0xFF;
-    ram.whole_bank[1] = 0xA2;
+    ram.0[0] = 0xFF;
+    ram.0[1] = 0xA2;
     assert_eq!(fetch_opcode(&registers.program_counter, &ram), 0xFFA2);
 
 }
@@ -395,7 +393,7 @@ fn test_decode_execute_op() {
     ];
     let mut x = 0;
     for element in test_ops.iter() {
-        ram.whole_bank[x] = *element;
+        ram.0[x] = *element;
         x += 1;
     }
     loop {
