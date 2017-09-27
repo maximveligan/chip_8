@@ -7,17 +7,89 @@ struct Interpreter {
     registers: Registers,
 }
 
-struct Nybble(u8);
+enum Opcode {
+    ZeroArg(ZeroArg),
+    OneArg(OneArg),
+    TwoArg(TwoArg),
+    ThreeArg(ThreeArg),
+}
+
+enum ZeroArg {
+    ClearScreen, //00E0
+    ReturnSubrt, //00EE
+}
+
+enum OneArg {
+    SkipIfVx(Nybble), // Ex9E
+    SkipIfNotVx(Nybble), // ExA1
+    SetVxDT(Nybble), // Fx07
+    WaitForKey(Nybble), // Fx0A
+    SetDT(Nybble), // Fx15
+    SetST(Nybble), // Fx18
+    SetI(Nybble), // Fx1E
+    SetSpriteI(Nybble), // Fx29
+    StoreDecVx(Nybble), // Fx33
+    StoreV0Vx(Nybble), // Fx55
+    ReadV0Vx(Nybble), // Fx65
+}
+
+enum TwoArg {
+    SkipEqVxVy(DoubleNybble), // 5xy0
+    VxEqVy(DoubleNybble), //8xy0
+    VxEqVxORVy(DoubleNybble), //8xy1
+    VxEqVxANDVy(DoubleNybble), //8xy2
+    VxEqVxXORVy(DoubleNybble), //8xy3
+    VxEqVxPlusVySetF(DoubleNybble), //8xy4
+    VxEqVxSubVySetF(DoubleNybble), //8xy5
+    ShiftVxRight(DoubleNybble), //8xy6
+    VxEqVySubVxFNotBor(DoubleNybble), //8xy7
+    ShiftVxLeft(DoubleNybble), //8xyE
+    SkipIfVxNotEqVy(DoubleNybble), //9xy0
+}
+
+enum ThreeArg {
+    JumpToCodeRoutNNN(TripleNybble), //0nnn
+    JumpToAddrNNN(TripleNybble), //1nnn
+    CallSubAtNNN(TripleNybble), //2nnn
+    SkipIfVxEqKK(TripleNybble), //3xkk
+    SkipIfVxNEqKK(TripleNybble), //4xkk
+    SetVxKK(TripleNybble), //6xkk
+    VxEqVxPlusKK(TripleNybble), //7xkk
+    SetIToNNN(TripleNybble), //Annn
+    PCEqNNNPlusV0(TripleNybble), //Bnnn
+    VxEqRandANDKK(TripleNybble), //Cxkk
+    DrawVxVyNib(TripleNybble), //Dxyn
+}
+
+
+struct Nybble([u8; 1]);
 
 impl Nybble {
-    fn new(argument: u8) -> Self {
-        if ((argument & (0b11110000) != 0)) {
+    fn new(argument: [u8; 1]) -> Self {
+        if ((argument[0] & (0b11110000) != 0)) {
             panic!(
                 "Invalid nybble value: {:X}. Did your nybble get parsed in correctly?",
-                argument
+                argument[0]
             );
         } else {
-            Nybble { 0: argument }
+            Nybble(argument)
+        }
+    }
+}
+
+struct DoubleNybble([u8; 1]);
+
+struct TripleNybble([u8; 2]);
+
+impl TripleNybble {
+    fn new(argument: [u8; 2]) -> Self {
+        if ((argument[0] & (0b11110000) != 0)) {
+            panic!(
+                "Invalid nybble value: {:X}. Did your three arguments get parsed in correctly?",
+                argument[0]
+            );
+        } else {
+            TripleNybble(argument)
         }
     }
 }
@@ -27,21 +99,21 @@ struct Registers {
     delay: u8,
     sound: u8,
     flag: u8,
-    stackPointer: u8,
-    iRegister: u16,
+    stack_pointer: u8,
+    i_register: u16,
     v_registers: [u8; 15],
 }
 
 impl Registers {
     fn new() -> Registers {
-        let chip8Adrr = 0x200;
+        let chip_8_adrr = 0x200;
         Registers {
-            program_counter: ProgramCounter(chip8Adrr),
+            program_counter: ProgramCounter(chip_8_adrr),
             delay: 0,
             sound: 0,
             flag: 0,
-            iRegister: 0,
-            stackPointer: 0,
+            i_register: 0,
+            stack_pointer: 0,
             v_registers: [0; 15],
         }
     }
@@ -68,7 +140,7 @@ fn main() {
     let mut registers: Registers = Registers::new();
     load_rom("dev");
     loop {
-        decode_execute_op(fetch_opcode(&registers.program_counter, &ram));
+        decode_op(fetch_opcode(&registers.program_counter, &ram));
         registers.program_counter.update_counter();
     }
 }
@@ -91,31 +163,42 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     (((left_byte as u16) << 8) | (right_byte as u16))
 }
 
-fn decode_execute_op(opcode: u16) -> () {
+fn extract_triple(opcode: u16) -> TripleNybble {
+    TripleNybble::new(([(opcode & 0x0F00) as u8, (opcode & 0x00FF) as u8]))
+}
+
+fn extract_double(opcode: u16) -> DoubleNybble {
+    DoubleNybble([((opcode >> 4) & 0x0FF) as u8])
+}
+
+fn extract_single(opcode: u16) -> Nybble {
+    Nybble::new(([((opcode >> 8) & 0x0F) as u8]))
+}
+
+fn decode_op(opcode: u16) -> Opcode {
     match opcode {
-        0x00E0 => println!("Got to opcode {:X}", opcode),
-        0x00EE => println!("Got to opcode {:X}", opcode),
+        0x00E0 => Opcode::ZeroArg(ZeroArg::ClearScreen),
+        0x00EE => Opcode::ZeroArg(ZeroArg::ReturnSubrt),
         _ => {
             match (opcode & 0xF000) {
                 0xF000 => {
                     match (opcode & 0x00F0) {
-                        0x0060 => println!("Got to opcode {:X}", opcode),
-                        0x0050 => println!("Got to opcode {:X}", opcode),
-                        0x0030 => println!("Got to opcode {:X}", opcode),
-                        0x0020 => println!("Got to opcode {:X}", opcode),
+                        0x0060 => Opcode::OneArg(OneArg::ReadV0Vx(extract_single(opcode))),
+                        0x0050 => Opcode::OneArg(OneArg::StoreV0Vx(extract_single(opcode))),
+                        0x0030 => Opcode::OneArg(OneArg::StoreDecVx(extract_single(opcode))),
+                        0x0020 => Opcode::OneArg(OneArg::SetSpriteI(extract_single(opcode))),
                         0x0010 => {
                             match (opcode & 0x000F) {
-                                0x000E => println!("Got to opcode {:X}", opcode),
-                                0x0008 => println!("Got to opcode {:X}", opcode),
-                                0x0005 => println!("Got to opcode {:X}", opcode),
+                                0x000E => Opcode::OneArg(OneArg::SetI(extract_single(opcode))),
+                                0x0008 => Opcode::OneArg(OneArg::SetST(extract_single(opcode))),
+                                0x0005 => Opcode::OneArg(OneArg::SetDT(extract_single(opcode))),
                                 _ => panic!("Unsupported or corrupt opcode"),
                             }
                         }
                         0x0000 => {
                             match (opcode & 0x000F) {
-                                0x000A => println!("Got to opcode {:X}", opcode),
-                                0x0007 => println!("Got to opcode {:X}", opcode),
-                                0x0001 => println!("Got to opcode {:X}", opcode),
+                                0x000A => Opcode::OneArg(OneArg::WaitForKey(extract_single(opcode))),
+                                0x0007 => Opcode::OneArg(OneArg::SetVxDT(extract_single(opcode))),
                                 _ => panic!("Unsupported or corrupt opcode"),
                             }
                         }
@@ -124,46 +207,43 @@ fn decode_execute_op(opcode: u16) -> () {
                 }
                 0xE000 => {
                     match (opcode & 0x00F0) {
-                        0x00A0 => println!("Got to opcode {:X}", opcode),
-                        0x0090 => println!("Got to opcode {:X}", opcode),
+                        0x00A0 => Opcode::OneArg(OneArg::SkipIfNotVx(extract_single(opcode))),
+                        0x0090 => Opcode::OneArg(OneArg::SkipIfVx(extract_single(opcode))),
                         _ => panic!("unsupported or Corrupt opcode"),
                     }
                 }
-                0xD000 => println!("Got to opcode {:X}", opcode),
-                0xC000 => println!("Got to opcode {:X}", opcode),
-                0xB000 => println!("Got to opcode {:X}", opcode),
-                0xA000 => println!("Got to opcode {:X}", opcode),
-                0x9000 => println!("Got to opcode {:X}", opcode),
+                0xD000 => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(extract_triple(opcode))),
+                0xC000 => Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(extract_triple(opcode))),
+                0xB000 => Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(extract_triple(opcode))),
+                0xA000 => Opcode::ThreeArg(ThreeArg::SetIToNNN(extract_triple(opcode))),
+                0x9000 => Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(extract_double(opcode))),
                 0x8000 => {
                     match (opcode & 0x000E) {
-                        0x000E => println!("Got to opcode {:X}", opcode),
-                        0x0007 => println!("Got to opcode {:X}", opcode),
-                        0x0006 => println!("Got to opcode {:X}", opcode),
-                        0x0005 => println!("Got to opcode {:X}", opcode),
-                        0x0004 => println!("Got to opcode {:X}", opcode),
-                        0x0003 => println!("Got to opcode {:X}", opcode),
-                        0x0002 => println!("Got to opcode {:X}", opcode),
-                        0x0001 => println!("Got to opcode {:X}", opcode),
-                        0x0000 => println!("Got to opcode {:X}", opcode),
+                        0x000E => Opcode::TwoArg(TwoArg::ShiftVxLeft(extract_double(opcode))),
+                        0x0007 => Opcode::TwoArg(TwoArg::VxEqVySubVxFNotBor(extract_double(opcode))),
+                        0x0006 => Opcode::TwoArg(TwoArg::ShiftVxRight(extract_double(opcode))),
+                        0x0005 => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(extract_double(opcode))),
+                        0x0004 => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(extract_double(opcode))),
+                        0x0003 => Opcode::TwoArg(TwoArg::VxEqVxXORVy(extract_double(opcode))),
+                        0x0002 => Opcode::TwoArg(TwoArg::VxEqVxANDVy(extract_double(opcode))),
+                        0x0001 => Opcode::TwoArg(TwoArg::VxEqVxORVy(extract_double(opcode))),
+                        0x0000 => Opcode::TwoArg(TwoArg::VxEqVy(extract_double(opcode))),
                         _ => panic!("Unsupported or corrupt opcode"),
                     }
                 }
-                0x7000 => println!("Got to opcode {:X}", opcode),
-                0x6000 => println!("Got to opcode {:X}", opcode),
-                0x5000 => println!("Got to opcode {:X}", opcode),
-                0x4000 => println!("Got to opcode {:X}", opcode),
-                0x3000 => println!("Got to opcode {:X}", opcode),
-                0x2000 => println!("Got to opcode {:X}", opcode),
-                0x1000 => println!("Got to opcode {:X}", opcode),
-                0x0000 => println!("Got to opcode {:X}", opcode),
+                0x7000 => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(extract_triple(opcode))),
+                0x6000 => Opcode::ThreeArg(ThreeArg::SetVxKK(extract_triple(opcode))),
+                0x5000 => Opcode::TwoArg(TwoArg::SkipEqVxVy(extract_double(opcode))),
+                0x4000 => Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(extract_triple(opcode))), 
+                0x3000 => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(extract_triple(opcode))), 
+                0x2000 => Opcode::ThreeArg(ThreeArg::CallSubAtNNN(extract_triple(opcode))), 
+                0x1000 => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(extract_triple(opcode))), 
+                0x0000 => Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(extract_triple(opcode))),
                 _ => panic!("Unsupported or corrupt opcode"),
             }
         }
     }
 }
-//fn extract_operand(opcode: u16) -> Nybble {
-//
-//}
 
 fn clear_screen() {
     unimplemented!();
@@ -351,7 +431,7 @@ fn test_nybble() {
 }
 
 #[test]
-fn test_decode_execute_op() {
+fn test_decode_op() {
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
     let test_ops: [u8; 70] = [
@@ -397,7 +477,7 @@ fn test_decode_execute_op() {
         x += 1;
     }
     loop {
-        decode_execute_op(fetch_opcode(&registers.program_counter, &ram));
+        decode_op(fetch_opcode(&registers.program_counter, &ram));
         registers.program_counter.update_counter();
         if (registers.program_counter.0 == 70) {
             break;
