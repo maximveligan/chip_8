@@ -427,7 +427,7 @@ fn fetch_opcode_test() {
 #[test]
 #[should_panic]
 fn test_nybble() {
-    let nybble: Nybble = Nybble::new(0xFA);
+    let nybble: Nybble = Nybble::new([0xFA]);
 }
 
 #[test]
