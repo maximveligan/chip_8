@@ -245,6 +245,47 @@ fn decode_op(opcode: u16) -> Opcode {
     }
 }
 
+fn execute(opcode: Opcode) {
+    match opcode {
+        Opcode::ZeroArg(ZeroArg::ClearScreen) => clear_screen(), //00E0
+        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => unimplemented!(),  //00EE
+        Opcode::OneArg(OneArg::SkipIfVx(arg)) =>  unimplemented!(), // Ex9E
+        Opcode::OneArg(OneArg::SkipIfNotVx(arg)) =>  unimplemented!(), // ExA1
+        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  unimplemented!(), // Fx07
+        Opcode::OneArg(OneArg::WaitForKey(arg)) =>  unimplemented!(), // Fx0A
+        Opcode::OneArg(OneArg::SetDT(arg)) =>  unimplemented!(), // Fx15
+        Opcode::OneArg(OneArg::SetST(arg)) =>  unimplemented!(), // Fx18
+        Opcode::OneArg(OneArg::SetI(arg)) =>  unimplemented!(), // Fx1E
+        Opcode::OneArg(OneArg::SetSpriteI(arg)) =>  unimplemented!(), // Fx29
+        Opcode::OneArg(OneArg::StoreDecVx(arg)) =>  unimplemented!(), // Fx33
+        Opcode::OneArg(OneArg::StoreV0Vx(arg)) =>  unimplemented!(), // Fx55
+        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  unimplemented!(), // Fx65
+        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => unimplemented!(), // 5xy0
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => unimplemented!() , //8xy0
+        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => unimplemented!() , //8xy1
+        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => unimplemented!() , //8xy2
+        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => unimplemented!() , //8xy3
+        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => unimplemented!() , //8xy4
+        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => unimplemented!() , //8xy5
+        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => unimplemented!() , //8xy6
+        Opcode::TwoArg(TwoArg::VxEqVySubVxFNotBor(arg)) => unimplemented!() , //8xy7
+        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => unimplemented!() , //8xyE
+        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => unimplemented!() , //9xy0
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => unimplemented!() , //0nnn
+        Opcode::ThreeArg(ThreeArg:: JumpToAddrNNN(arg)) => unimplemented!() , //1nnn
+        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => unimplemented!() , //2nnn
+        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => unimplemented!() , //3xkk
+        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => unimplemented!() , //4xkk
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => unimplemented!() , //6xkk
+        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => unimplemented!() , //7xkk
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => unimplemented!() , //Annn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => unimplemented!() , //Bnnn
+        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => unimplemented!() , //Cxkk
+        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => unimplemented!() , //Dxyn
+        _ => panic!("Corrupt or unsupported op"),
+    }
+}
+
 fn clear_screen() {
     unimplemented!();
 }
@@ -428,6 +469,12 @@ fn fetch_opcode_test() {
 #[should_panic]
 fn test_nybble() {
     let nybble: Nybble = Nybble::new([0xFA]);
+}
+
+#[test]
+#[should_panic]
+fn test_triple_nybble() {
+    let tnybble: TripleNybble = TripleNybble::new([0xFA, 0xFD]);
 }
 
 #[test]
