@@ -42,7 +42,7 @@ enum TwoArg {
     VxEqVxPlusVySetF(DoubleNybble), //8xy4
     VxEqVxSubVySetF(DoubleNybble), //8xy5
     ShiftVxRight(DoubleNybble), //8xy6
-    VxEqVySubVxFNotBor(DoubleNybble), //8xy7
+    VxEqVySubVxSetF(DoubleNybble), //8xy7
     ShiftVxLeft(DoubleNybble), //8xyE
     SkipIfVxNotEqVy(DoubleNybble), //9xy0
 }
@@ -164,7 +164,7 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 }
 
 fn extract_triple(opcode: u16) -> TripleNybble {
-    TripleNybble::new(([(opcode & 0x0F00) as u8, (opcode & 0x00FF) as u8]))
+    TripleNybble::new(([((opcode & 0x0F00) >> 8) as u8, (opcode & 0x00FF) as u8]))
 }
 
 fn extract_double(opcode: u16) -> DoubleNybble {
@@ -220,7 +220,7 @@ fn decode_op(opcode: u16) -> Opcode {
                 0x8000 => {
                     match (opcode & 0x000E) {
                         0x000E => Opcode::TwoArg(TwoArg::ShiftVxLeft(extract_double(opcode))),
-                        0x0007 => Opcode::TwoArg(TwoArg::VxEqVySubVxFNotBor(extract_double(opcode))),
+                        0x0007 => Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(extract_double(opcode))),
                         0x0006 => Opcode::TwoArg(TwoArg::ShiftVxRight(extract_double(opcode))),
                         0x0005 => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(extract_double(opcode))),
                         0x0004 => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(extract_double(opcode))),
@@ -248,40 +248,40 @@ fn decode_op(opcode: u16) -> Opcode {
 fn execute(opcode: Opcode) {
     match opcode {
         Opcode::ZeroArg(ZeroArg::ClearScreen) => clear_screen(), //00E0
-        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => unimplemented!(),  //00EE
-        Opcode::OneArg(OneArg::SkipIfVx(arg)) =>  unimplemented!(), // Ex9E
-        Opcode::OneArg(OneArg::SkipIfNotVx(arg)) =>  unimplemented!(), // ExA1
-        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  unimplemented!(), // Fx07
-        Opcode::OneArg(OneArg::WaitForKey(arg)) =>  unimplemented!(), // Fx0A
-        Opcode::OneArg(OneArg::SetDT(arg)) =>  unimplemented!(), // Fx15
-        Opcode::OneArg(OneArg::SetST(arg)) =>  unimplemented!(), // Fx18
-        Opcode::OneArg(OneArg::SetI(arg)) =>  unimplemented!(), // Fx1E
-        Opcode::OneArg(OneArg::SetSpriteI(arg)) =>  unimplemented!(), // Fx29
-        Opcode::OneArg(OneArg::StoreDecVx(arg)) =>  unimplemented!(), // Fx33
-        Opcode::OneArg(OneArg::StoreV0Vx(arg)) =>  unimplemented!(), // Fx55
-        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  unimplemented!(), // Fx65
-        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => unimplemented!(), // 5xy0
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => unimplemented!() , //8xy0
-        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => unimplemented!() , //8xy1
-        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => unimplemented!() , //8xy2
-        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => unimplemented!() , //8xy3
-        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => unimplemented!() , //8xy4
-        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => unimplemented!() , //8xy5
-        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => unimplemented!() , //8xy6
-        Opcode::TwoArg(TwoArg::VxEqVySubVxFNotBor(arg)) => unimplemented!() , //8xy7
-        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => unimplemented!() , //8xyE
-        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => unimplemented!() , //9xy0
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => unimplemented!() , //0nnn
-        Opcode::ThreeArg(ThreeArg:: JumpToAddrNNN(arg)) => unimplemented!() , //1nnn
-        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => unimplemented!() , //2nnn
-        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => unimplemented!() , //3xkk
-        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => unimplemented!() , //4xkk
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => unimplemented!() , //6xkk
-        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => unimplemented!() , //7xkk
-        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => unimplemented!() , //Annn
-        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => unimplemented!() , //Bnnn
-        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => unimplemented!() , //Cxkk
-        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => unimplemented!() , //Dxyn
+        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(),  //00EE
+        Opcode::OneArg(OneArg::SkipIfVx(arg)) =>  skip_if_vx(arg), // Ex9E
+        Opcode::OneArg(OneArg::SkipIfNotVx(arg)) =>  skip_if_not_vx(arg), // ExA1
+        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  load_dt_in_vx(arg), // Fx07
+        Opcode::OneArg(OneArg::WaitForKey(arg)) =>  load_key_vx(arg), // Fx0A
+        Opcode::OneArg(OneArg::SetDT(arg)) => load_vx_in_dt(arg), // Fx15
+        Opcode::OneArg(OneArg::SetST(arg)) => load_vx_in_st(arg), // Fx18
+        Opcode::OneArg(OneArg::SetI(arg)) =>  i_plus_eq_vx(arg), // Fx1E
+        Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), // Fx29
+        Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(arg), // Fx33
+        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
+        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
+        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg), // 5xy0
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg) , //8xy0
+        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => or_vx_vy(arg) , //8xy1
+        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => and_vx_vy(arg) , //8xy2
+        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => xor_vx_vy(arg) , //8xy3
+        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg) , //8xy4
+        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg) , //8xy5
+        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg) , //8xy6
+        Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg) , //8xy7
+        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg) , //8xyE
+        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg) , //9xy0
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => sys_address_nnn(arg) , //0nnn
+        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => jump_addr_nnn(arg) , //1nnn
+        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
+        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg) , //3xkk
+        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg) , //4xkk
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg) , //6xkk
+        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => add_byte_to_vx(arg) , //7xkk
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg) , //Annn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg) , //Bnnn
+        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => vx_eq_rand(arg) , //Cxkk
+        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
     }
 }
@@ -315,32 +315,32 @@ fn jump_v0_addr_nnn() {
 }
 
 //skips next instruction if vx == kk
-fn skip_e_vx_byte() {
+fn skip_vx_eq_kk() {
     unimplemented!();
 }
 
 //skips next instruction if vx != kk
-fn skip_ne_vx_byte() {
+fn skip_vx_neq_kk() {
     unimplemented!();
 }
 
 //skip next instruction if vx == vy
-fn skip_e_vx_vy() {
+fn skip_vx_eq_vy() {
     unimplemented!();
 }
 
-//skip next instruction if vx == kk
-fn load_vx_byte() {
+//Load kk into Vx
+fn load_vx_kk() {
     unimplemented!();
 }
 
 //set vx = vx + kk
-fn add_vx_byte() {
+fn add_byte_to_vx() {
     unimplemented!();
 }
 
 //set vx = vy
-fn load_vx_vy() {
+fn load_vy_in_vx() {
     unimplemented!();
 }
 
@@ -360,12 +360,12 @@ fn xor_vx_vy() {
 }
 
 //set vx = vx + vy, set fv = carry
-fn add_vx_vy_ld_vf() {
+fn add_vx_vy_f_carry() {
     unimplemented!();
 }
 
 //set vx = vx - vy, set fv = not borrow
-fn subtract_vx_vy() {
+fn sub_vx_vy_f_nbor() {
     unimplemented!();
 }
 
@@ -375,8 +375,8 @@ fn shift_r_vx_vy() {
     }
 
 
-//set vx = vx - vy, set vf = not borrow
-fn subtract_n_vx_vy() -> () {
+//set vx = vy - vx, set vf = not borrow
+fn sub_vy_vx_f_nbor() -> () {
     unimplemented!();
 }
 
@@ -386,72 +386,72 @@ fn shift_l_vx_vy() -> () {
 }
 
 //skip next instruction if vx != vy
-fn skip_ne_vx_vy() -> () {
+fn skip_vx_neq_vy() -> () {
     unimplemented!();
 }
 
 //set vx = random byte and kk
-fn random_vx_byte() -> () {
+fn vx_eq_rand() -> () {
     unimplemented!();
 }
 
 //display n-byte sprite starting at memory location (vx, vy) set vf = collision
-fn draw_vx_vy_nibble() -> () {
+fn draw_vx_vy_nybble() -> () {
     unimplemented!();
 }
 
 //skip next instruction if key with the value vx is pressed
-fn skip_p_vx() -> () {
+fn skip_if_vx() -> () {
     unimplemented!();
 }
 
 // skip next instruction if key with the value vx is not pressed
-fn skip_np_vx() -> () {
+fn skip_if_not_vx() -> () {
     unimplemented!();
 }
 
 //set vx to delay timer value
-fn load_vx_dt() -> () {
+fn load_dt_in_vx() -> () {
     unimplemented!();
 }
 
 //wait for key press, store the value of the key in vx
-fn load_vx_k() -> () {
+fn load_key_vx() -> () {
     unimplemented!();
 }
 
 //set delay timer = vx
-fn load_dt_vx() -> () {
+fn load_vx_in_dt() -> () {
     unimplemented!();
 }
 
 //set sound timer = vx
-fn load_st_vx() -> () {
+fn load_vx_in_st() -> () {
     unimplemented!();
 }
 
 //set i = i + vx
-fn add_i_vx() -> () {
+fn i_plus_eq_vx() -> () {
     unimplemented!();
 }
 
 //set i = location of sprite for digit vx
-fn loadf_vx() {
+fn i_eq_spr_digit_vx() {
     unimplemented!();
 }
 
 //store bcd representation of vx in memory location i, i+1, i+2
-fn loadb_vx() {
+fn store_dec_vx_in_i() {
     unimplemented!();
 }
 
 //stores registers v0 through vx in memory starting at location i
-fn store_vx_starting_at_i() -> () {
+fn store_vx_v0_in_i() -> () {
     unimplemented!();
 }
 
 //read registers v0 through vx in memory starting at location i
-fn read_vx_starting_at_i() -> () {
+fn read_i_in_vx_v0() -> () {
     unimplemented!();
 }
 
