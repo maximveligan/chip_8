@@ -61,7 +61,6 @@ enum ThreeArg {
     DrawVxVyNib(TripleNybble), //Dxyn
 }
 
-
 struct Nybble([u8; 1]);
 
 impl Nybble {
@@ -286,172 +285,143 @@ fn execute(opcode: Opcode) {
     }
 }
 
-fn clear_screen() {
+fn clear_screen() {  //00E0
     unimplemented!();
 }
 
-fn ret_subroutine() {
+fn ret_subroutine() {  //00EE
     unimplemented!();
 }
 
-fn sys_address_nnn() {
+fn sys_address_nnn(addr: TripleNybble) { //0nnn
     unimplemented!();
 }
 
-fn jump_addr_nnn() {
+fn jump_addr_nnn(addr: TripleNybble) { //1nnn
     unimplemented!();
 }
 
-fn call_addr_nnn() {
+fn call_addr_nnn(addr: TripleNybble) { //2nnn
     unimplemented!();
 }
 
-fn load_i_addr() {
+fn load_i_addr(addr: TripleNybble) { //Annn
     unimplemented!();
 }
 
-fn jump_v0_addr_nnn() {
+fn jump_v0_addr_nnn(addr: TripleNybble) { //Bnnn
     unimplemented!();
 }
 
-//skips next instruction if vx == kk
-fn skip_vx_eq_kk() {
+fn skip_vx_eq_kk(byte_args: TripleNybble) {  //3xkk
     unimplemented!();
 }
 
-//skips next instruction if vx != kk
-fn skip_vx_neq_kk() {
+fn skip_vx_neq_kk(byte_args: TripleNybble) {  //4xkk
     unimplemented!();
 }
 
-//skip next instruction if vx == vy
-fn skip_vx_eq_vy() {
+fn skip_vx_eq_vy(byte_args: DoubleNybble) {  // 5xy0
     unimplemented!();
 }
 
-//Load kk into Vx
-fn load_vx_kk() {
+fn load_vx_kk(byte_args: TripleNybble) {  //6xkk
     unimplemented!();
 }
 
-//set vx = vx + kk
-fn add_byte_to_vx() {
+fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
     unimplemented!();
 }
 
-//set vx = vy
-fn load_vy_in_vx() {
+fn load_vy_in_vx(byte_args: DoubleNybble) {  //8xy0
     unimplemented!();
 }
 
-//set vx = vx or vy
-fn or_vx_vy() {
+fn or_vx_vy(byte_args: DoubleNybble) {  //8xy3
     unimplemented!();
 }
 
-//set vx = vx and vy
-fn and_vx_vy() {
+fn and_vx_vy(byte_args: DoubleNybble) {  //8xy2
     unimplemented!();
 }
 
-//set vx = vx xor vy
-fn xor_vx_vy() {
+fn xor_vx_vy(byte_args: DoubleNybble) {  //8xy3
     unimplemented!();
 }
 
-//set vx = vx + vy, set fv = carry
-fn add_vx_vy_f_carry() {
+fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
     unimplemented!();
 }
 
-//set vx = vx - vy, set fv = not borrow
-fn sub_vx_vy_f_nbor() {
+fn sub_vx_vy_f_nbor(byte_args: DoubleNybble) {  //8xy5
     unimplemented!();
 }
 
-//set vx = vx shr 1
-fn shift_r_vx_vy() {
+fn shift_r_vx_vy(byte_args: DoubleNybble) {  //8xy6
     unimplemented!();
     }
 
-
-//set vx = vy - vx, set vf = not borrow
-fn sub_vy_vx_f_nbor() -> () {
+fn sub_vy_vx_f_nbor(byte_args: DoubleNybble) {  //8xy7
     unimplemented!();
 }
 
-//set vx = vx shl 1
-fn shift_l_vx_vy() -> () {
+fn shift_l_vx_vy(byte_args: DoubleNybble) {  //8xyE
     unimplemented!();
 }
 
-//skip next instruction if vx != vy
-fn skip_vx_neq_vy() -> () {
+fn skip_vx_neq_vy(byte_args: DoubleNybble) {  //9xy0
     unimplemented!();
 }
 
-//set vx = random byte and kk
-fn vx_eq_rand() -> () {
+fn vx_eq_rand(byte_args: TripleNybble) {  //Cxkk
     unimplemented!();
 }
 
-//display n-byte sprite starting at memory location (vx, vy) set vf = collision
-fn draw_vx_vy_nybble() -> () {
+fn draw_vx_vy_nybble(byte_args: TripleNybble) { //Dxyn
     unimplemented!();
 }
 
-//skip next instruction if key with the value vx is pressed
-fn skip_if_vx() -> () {
+fn skip_if_vx(byte_arg: Nybble) { // Ex9E
     unimplemented!();
 }
 
-// skip next instruction if key with the value vx is not pressed
-fn skip_if_not_vx() -> () {
+fn skip_if_not_vx(byte_arg: Nybble) {  // ExA1
     unimplemented!();
 }
 
-//set vx to delay timer value
-fn load_dt_in_vx() -> () {
+fn load_dt_in_vx(byte_arg: Nybble) {  // Fx07
     unimplemented!();
 }
 
-//wait for key press, store the value of the key in vx
-fn load_key_vx() -> () {
+fn load_key_vx(byte_arg: Nybble) {  // Fx0A
     unimplemented!();
 }
 
-//set delay timer = vx
-fn load_vx_in_dt() -> () {
+fn load_vx_in_dt(byte_arg: Nybble) {  // Fx15
     unimplemented!();
 }
 
-//set sound timer = vx
-fn load_vx_in_st() -> () {
+fn load_vx_in_st(byte_arg: Nybble) {  // Fx18
     unimplemented!();
 }
 
-//set i = i + vx
-fn i_plus_eq_vx() -> () {
+fn i_plus_eq_vx(byte_arg: Nybble) {  // Fx1E
     unimplemented!();
 }
 
-//set i = location of sprite for digit vx
-fn i_eq_spr_digit_vx() {
+fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
     unimplemented!();
 }
 
-//store bcd representation of vx in memory location i, i+1, i+2
-fn store_dec_vx_in_i() {
+fn store_dec_vx_in_i(byte_arg: Nybble) {  // Fx33
     unimplemented!();
 }
 
-//stores registers v0 through vx in memory starting at location i
-fn store_vx_v0_in_i() -> () {
+fn store_vx_v0_in_i(byte_arg: Nybble) {  // Fx55
     unimplemented!();
 }
 
-//read registers v0 through vx in memory starting at location i
-fn read_i_in_vx_v0() -> () {
+fn read_i_in_vx_v0(byte_arg: Nybble) {  // Fx65
     unimplemented!();
 }
 
