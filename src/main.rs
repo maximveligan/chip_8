@@ -129,7 +129,7 @@ impl Ram {
     }
 }
 
-struct ProgramCounter(u8);
+struct ProgramCounter(u16);
 
 impl ProgramCounter {
     fn update_counter(&mut self) {
@@ -175,6 +175,10 @@ fn extract_double(opcode: u16) -> DoubleNybble {
 
 fn extract_single(opcode: u16) -> Nybble {
     Nybble::new(([((opcode >> 8) & 0x0F) as u8]))
+}
+
+fn triple_nyb_to_addr(arg: &TripleNybble) -> u16 {
+    ((((arg.0[0] as u16) << 8) | (arg.0[1]) as u16))  
 }
 
 fn decode_op(opcode: u16) -> Opcode {
@@ -247,7 +251,7 @@ fn decode_op(opcode: u16) -> Opcode {
     }
 }
 
-fn execute(opcode: Opcode) {
+fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
     match opcode {
         Opcode::ZeroArg(ZeroArg::ClearScreen) => clear_screen(), //00E0
         Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(),  //00EE
@@ -274,7 +278,7 @@ fn execute(opcode: Opcode) {
         Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg) , //8xyE
         Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg) , //9xy0
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => sys_address_nnn(arg) , //0nnn
-        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => jump_addr_nnn(arg) , //1nnn
+        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => jump_addr_nnn(arg, &mut registers.program_counter) , //1nnn
         Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
         Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg) , //3xkk
         Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg) , //4xkk
@@ -300,7 +304,8 @@ fn sys_address_nnn(addr: TripleNybble) { //0nnn
     println!("Got to opcode {:?}" , addr);
 }
 
-fn jump_addr_nnn(addr: TripleNybble) { //1nnn
+fn jump_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter) { //1nnn
+    pc.0 = triple_nyb_to_addr(&addr);
     println!("Got to opcode {:?}" , addr);
 }
 
@@ -439,6 +444,18 @@ fn fetch_opcode_test() {
 }
 
 #[test]
+fn test_jump_addr_nnn() {
+    let mut registers: Registers = Registers::new();
+    jump_addr_nnn(TripleNybble::new([0x0F,0xAC]), &mut registers.program_counter);
+    assert_eq!(registers.program_counter.0, 0x0FAC)
+}
+
+#[test]
+fn test_triple_nyb_to_addr() {
+    assert_eq!(0x0FBA, triple_nyb_to_addr(&TripleNybble::new([0x0F,0xBA])))
+}
+
+#[test]
 #[should_panic]
 fn test_nybble() {
     let nybble: Nybble = Nybble::new([0xFA]);
@@ -497,7 +514,7 @@ fn test_decode_op() {
         x += 1;
     }
     loop {
-        execute(decode_op(fetch_opcode(&registers.program_counter, &ram)));
+        decode_op(fetch_opcode(&registers.program_counter, &ram));
         registers.program_counter.update_counter();
         if (registers.program_counter.0 == 70) {
             break;
