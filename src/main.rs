@@ -494,12 +494,13 @@ fn test_decode_op() {
         x += 1;
     }
     loop {
-        decode_op(fetch_opcode(&registers.program_counter, &ram));
+        execute(decode_op(fetch_opcode(&registers.program_counter, &ram)));
         registers.program_counter.update_counter();
         if (registers.program_counter.0 == 70) {
             break;
         }
     }
+    panic!();
 }
 
 #[test]
