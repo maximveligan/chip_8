@@ -282,9 +282,9 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
         Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //3xkk
         Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //4xkk
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg) , //6xkk
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg, &mut registers.v_registers) , //6xkk
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => add_byte_to_vx(arg) , //7xkk
-        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg) , //Annn
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg, &mut registers.i_register) , //Annn
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg) , //Bnnn
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => vx_eq_rand(arg) , //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
@@ -312,8 +312,8 @@ fn call_addr_nnn(addr: TripleNybble) { //2nnn
     println!("Got to opcode {:?}" , addr);
 }
 
-fn load_i_addr(addr: TripleNybble) { //Annn
-    println!("Got to opcode {:?}" , addr);
+fn load_i_addr(addr: TripleNybble, i_reg: &mut u16) { //Annn
+    *i_reg = triple_nyb_to_addr(&addr);
 }
 
 fn jump_v0_addr_nnn(addr: TripleNybble) { //Bnnn
@@ -338,8 +338,8 @@ fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut Progr
     }
 }
 
-fn load_vx_kk(byte_args: TripleNybble) {  //6xkk
-    println!("Got to opcode {:?}" , byte_args);
+fn load_vx_kk(byte_args: TripleNybble, v_registers: &mut[u8; 15]) {  //6xkk
+    v_registers[byte_args.0[0] as usize] = byte_args.0[1];
 }
 
 fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
@@ -419,7 +419,7 @@ fn load_vx_in_st(byte_arg: Nybble) {  // Fx18
 }
 
 fn i_plus_eq_vx(byte_arg: Nybble) {  // Fx1E
-    println!("Got to opcode {:?}" , byte_arg);
+    
 }
 
 fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
@@ -588,4 +588,21 @@ fn test_skip_vx_eq_vy() {
     registers.v_registers[0xD] = 10;
     skip_vx_eq_vy(test, &registers.v_registers, &mut registers.program_counter);
     assert_eq!(registers.program_counter.0, 0x202)
+}
+
+#[test]
+fn test_load_i_addr() { //Annn
+    let mut registers = Registers::new();
+    let test = extract_triple(0xABA0);
+    load_i_addr(test, &mut registers.i_register);
+    assert_eq!(registers.i_register , 0xBA0);
+}
+
+
+#[test]
+fn test_load_vx_kk() {
+    let mut registers = Registers::new();
+    let test = extract_triple(0xB3B0);
+    load_vx_kk(test, &mut registers.v_registers);
+    assert_eq!(registers.v_registers[3], 0xB0)
 }
