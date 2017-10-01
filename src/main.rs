@@ -266,7 +266,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(arg), // Fx33
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
-        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg), // 5xy0
+        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
         Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg) , //8xy0
         Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => or_vx_vy(arg) , //8xy1
         Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => and_vx_vy(arg) , //8xy2
@@ -280,8 +280,8 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => sys_address_nnn(arg) , //0nnn
         Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => jump_addr_nnn(arg, &mut registers.program_counter) , //1nnn
         Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
-        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg) , //3xkk
-        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg) , //4xkk
+        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //3xkk
+        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //4xkk
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg) , //6xkk
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => add_byte_to_vx(arg) , //7xkk
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg) , //Annn
@@ -306,7 +306,6 @@ fn sys_address_nnn(addr: TripleNybble) { //0nnn
 
 fn jump_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter) { //1nnn
     pc.0 = triple_nyb_to_addr(&addr);
-    println!("Got to opcode {:?}" , addr);
 }
 
 fn call_addr_nnn(addr: TripleNybble) { //2nnn
@@ -321,16 +320,22 @@ fn jump_v0_addr_nnn(addr: TripleNybble) { //Bnnn
     println!("Got to opcode {:?}" , addr);
 }
 
-fn skip_vx_eq_kk(byte_args: TripleNybble) {  //3xkk
-    println!("Got to opcode {:?}" , byte_args);
+fn skip_vx_eq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //3xkk
+    if (v_registers[byte_args.0[0] as usize] == byte_args.0[1]) {
+        pc.update_counter();
+    }
 }
 
-fn skip_vx_neq_kk(byte_args: TripleNybble) {  //4xkk
-    println!("Got to opcode {:?}" , byte_args);
+fn skip_vx_neq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //4xkk
+    if (v_registers[byte_args.0[0] as usize] != byte_args.0[1]) {
+        pc.update_counter();
+    }
 }
 
-fn skip_vx_eq_vy(byte_args: DoubleNybble) {  // 5xy0
-    println!("Got to opcode {:?}" , byte_args);
+fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  // 5xy0
+    if (v_registers[(byte_args.0[0] >> 4) as usize] == v_registers[(byte_args.0[0] & 0x0F) as usize]) {
+        pc.update_counter();
+    }
 }
 
 fn load_vx_kk(byte_args: TripleNybble) {  //6xkk
@@ -434,9 +439,10 @@ fn read_i_in_vx_v0(byte_arg: Nybble) {  // Fx65
 }
 
 #[test]
-fn fetch_opcode_test() {
+fn test_fetch_opcode() {
     let mut ram: Ram = Ram::new();
-    let registers: Registers = Registers::new();
+    let mut registers: Registers = Registers::new();
+    registers.program_counter.0 = 0;
     ram.0[0] = 0xFF;
     ram.0[1] = 0xA2;
     assert_eq!(fetch_opcode(&registers.program_counter, &ram), 0xFFA2);
@@ -469,6 +475,8 @@ fn test_triple_nybble() {
 
 #[test]
 fn test_decode_op() {
+    let chip8_addr: u16 = 0x200;
+    let amount_of_ops: u16 = 35;
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
     let test_ops: [u8; 70] = [
@@ -508,19 +516,18 @@ fn test_decode_op() {
         0xF1, 0x55,
         0xF1, 0x65,
     ];
-    let mut x = 0;
+    let mut x = chip8_addr;
     for element in test_ops.iter() {
-        ram.0[x] = *element;
+        ram.0[x as usize] = *element;
         x += 1;
     }
     loop {
         decode_op(fetch_opcode(&registers.program_counter, &ram));
         registers.program_counter.update_counter();
-        if (registers.program_counter.0 == 70) {
+        if (registers.program_counter.0 == (chip8_addr + (amount_of_ops * 2))) {
             break;
         }
     }
-    panic!();
 }
 
 #[test]
@@ -553,4 +560,32 @@ fn test_wrong_rom_path() {
 #[test]
 fn test_rom_ram_loader() {
     panic!();
+}
+
+#[test]
+fn test_skip_vx_eq_kk() {
+    let mut registers = Registers::new();
+    let test = extract_triple(0x5DFA);
+    registers.v_registers[0xD] = 0xFA;
+    skip_vx_eq_kk(test, &registers.v_registers, &mut registers.program_counter);
+    assert_eq!(registers.program_counter.0, 0x202)
+}
+
+#[test]
+fn test_skip_vx_neq_kk() {
+    let mut registers = Registers::new();
+    let test = extract_triple(0x5DFA);
+    registers.v_registers[0xD] = 0xBA;
+    skip_vx_neq_kk(test, &registers.v_registers, &mut registers.program_counter);
+    assert_eq!(registers.program_counter.0, 0x202)
+}
+
+#[test]
+fn test_skip_vx_eq_vy() {
+    let mut registers = Registers::new();
+    let test = extract_double(0x50D0);
+    registers.v_registers[0x0] = 10;
+    registers.v_registers[0xD] = 10;
+    skip_vx_eq_vy(test, &registers.v_registers, &mut registers.program_counter);
+    assert_eq!(registers.program_counter.0, 0x202)
 }
