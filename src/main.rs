@@ -267,10 +267,10 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg) , //8xy0
-        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => or_vx_vy(arg) , //8xy1
-        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => and_vx_vy(arg) , //8xy2
-        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => xor_vx_vy(arg) , //8xy3
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg, &mut registers.v_registers) , //8xy0
+        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => or_vx_vy(arg, &mut registers.v_registers) , //8xy1
+        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => and_vx_vy(arg, &mut registers.v_registers) , //8xy2
+        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => xor_vx_vy(arg, &mut registers.v_registers) , //8xy3
         Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg) , //8xy4
         Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg) , //8xy5
         Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg) , //8xy6
@@ -346,20 +346,20 @@ fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
     println!("Got to opcode {:?}" , byte_args);
 }
 
-fn load_vy_in_vx(byte_args: DoubleNybble) {  //8xy0
-    println!("Got to opcode {:?}" , byte_args);
+fn load_vy_in_vx(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy0
+    v_registers[(byte_args.0[0] >> 4) as usize] = v_registers[(byte_args.0[0] & 0x0F) as usize];
 }
 
-fn or_vx_vy(byte_args: DoubleNybble) {  //8xy3
-    println!("Got to opcode {:?}" , byte_args);
+fn or_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy1
+    v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) | (v_registers[(byte_args.0[0] & 0x0F) as usize]);
 }
 
-fn and_vx_vy(byte_args: DoubleNybble) {  //8xy2
-    println!("Got to opcode {:?}" , byte_args);
+fn and_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy2
+     v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) & (v_registers[(byte_args.0[0] & 0x0F) as usize]);
 }
 
-fn xor_vx_vy(byte_args: DoubleNybble) {  //8xy3
-    println!("Got to opcode {:?}" , byte_args);
+fn xor_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy3
+      v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) ^ (v_registers[(byte_args.0[0] & 0x0F) as usize]);
 }
 
 fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
@@ -605,4 +605,44 @@ fn test_load_vx_kk() {
     let test = extract_triple(0xB3B0);
     load_vx_kk(test, &mut registers.v_registers);
     assert_eq!(registers.v_registers[3], 0xB0)
+}
+
+
+#[test]
+fn test_load_vy_in_vx() {
+    let mut registers = Registers::new();
+    let test = extract_double(0x8AB0);
+    registers.v_registers[0xB] = 0xA;
+    load_vy_in_vx(test, &mut registers.v_registers);
+    assert_eq!(registers.v_registers[0xA] , 0xA)
+}
+
+#[test]
+fn test_or_vx_vy() {
+    let mut registers = Registers::new();
+    let test = extract_double(0x0AB0);
+    registers.v_registers[0xA] = 1;
+    registers.v_registers[0xB] = 3;
+    or_vx_vy(test, &mut registers.v_registers);
+    assert_eq!(registers.v_registers[0xA] , 3)
+}
+
+#[test]
+fn test_and_vx_vy() {
+    let mut registers = Registers::new();
+    let test = extract_double(0x0AB0);
+    registers.v_registers[0xA] = 1;
+    registers.v_registers[0xB] = 3;
+    and_vx_vy(test, &mut registers.v_registers);
+    assert_eq!(registers.v_registers[0xA] , 1)
+}
+
+#[test]
+fn test_xor_vx_vy() {
+    let mut registers = Registers::new();
+    let test = extract_double(0x0AB0);
+    registers.v_registers[0xA] = 5;
+    registers.v_registers[0xB] = 7;
+    xor_vx_vy(test, &mut registers.v_registers);
+    assert_eq!(registers.v_registers[0xA] , 2)
 }
