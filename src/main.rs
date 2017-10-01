@@ -181,6 +181,12 @@ fn triple_nyb_to_addr(arg: &TripleNybble) -> u16 {
     ((((arg.0[0] as u16) << 8) | (arg.0[1]) as u16))  
 }
 
+fn grab_xy(arg: &DoubleNybble) -> (u8, u8) {
+    ((arg.0[0] >> 4) , (arg.0[0] & 0x0F))
+
+}
+
+
 fn decode_op(opcode: u16) -> Opcode {
     match opcode {
         0x00E0 => Opcode::ZeroArg(ZeroArg::ClearScreen),
@@ -333,7 +339,8 @@ fn skip_vx_neq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut Prog
 }
 
 fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  // 5xy0
-    if (v_registers[(byte_args.0[0] >> 4) as usize] == v_registers[(byte_args.0[0] & 0x0F) as usize]) {
+    let (x, y) = grab_xy(&byte_args);
+    if (v_registers[x as usize] == v_registers[y as usize]) {
         pc.update_counter();
     }
 }
@@ -347,19 +354,23 @@ fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
 }
 
 fn load_vy_in_vx(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy0
-    v_registers[(byte_args.0[0] >> 4) as usize] = v_registers[(byte_args.0[0] & 0x0F) as usize];
+    let (x, y) = grab_xy(&byte_args);
+    v_registers[x as usize] = v_registers[y as usize];
 }
 
 fn or_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy1
-    v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) | (v_registers[(byte_args.0[0] & 0x0F) as usize]);
+    let (x, y) = grab_xy(&byte_args);
+    v_registers[x as usize] = (v_registers[x as usize]) | (v_registers[y as usize]);
 }
 
 fn and_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy2
-     v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) & (v_registers[(byte_args.0[0] & 0x0F) as usize]);
+    let (x, y) = grab_xy(&byte_args);
+    v_registers[x as usize] = (v_registers[x as usize]) & (v_registers[y as usize]);
 }
 
 fn xor_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy3
-      v_registers[(byte_args.0[0] >> 4) as usize] = (v_registers[(byte_args.0[0] >> 4) as usize]) ^ (v_registers[(byte_args.0[0] & 0x0F) as usize]);
+    let (x, y) = grab_xy(&byte_args);
+    v_registers[x as usize] = (v_registers[x as usize]) ^ (v_registers[y as usize]);
 }
 
 fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
