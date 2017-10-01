@@ -100,7 +100,7 @@ struct Registers {
     program_counter: ProgramCounter,
     delay: u8,
     sound: u8,
-    flag: u8,
+    flag: bool,
     stack_pointer: u8,
     i_register: u16,
     v_registers: [u8; 15],
@@ -113,7 +113,7 @@ impl Registers {
             program_counter: ProgramCounter(chip_8_adrr),
             delay: 0,
             sound: 0,
-            flag: 0,
+            flag: false,
             i_register: 0,
             stack_pointer: 0,
             v_registers: [0; 15],
@@ -159,7 +159,6 @@ fn load_rom_into_mem(bytes: Vec<u8>, ram: &mut Ram) {
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
-    //  TODO: implement slice references for u8
     let left_byte: u8 = ram.0[pc.0 as usize];
     let right_byte: u8 = ram.0[(pc.0 + 1) as usize];
     (((left_byte as u16) << 8) | (right_byte as u16))
@@ -291,7 +290,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg, &mut registers.v_registers) , //6xkk
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => add_byte_to_vx(arg) , //7xkk
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg, &mut registers.i_register) , //Annn
-        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg) , //Bnnn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg, &mut registers.program_counter, registers.v_registers[0], ) , //Bnnn
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => vx_eq_rand(arg) , //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
@@ -322,8 +321,11 @@ fn load_i_addr(addr: TripleNybble, i_reg: &mut u16) { //Annn
     *i_reg = triple_nyb_to_addr(&addr);
 }
 
-fn jump_v0_addr_nnn(addr: TripleNybble) { //Bnnn
-    println!("Got to opcode {:?}" , addr);
+fn jump_v0_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, v_reg_zero: u8) { //Bnnn
+    pc.0 = (v_reg_zero as u16) + triple_nyb_to_addr(&addr);
+    if (pc.0 % 2 != 0) {
+        panic!("The pc was set to an uneven number. This should be impossible. Current val in V0 = {}", v_reg_zero);
+    }
 }
 
 fn skip_vx_eq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //3xkk
@@ -656,4 +658,13 @@ fn test_xor_vx_vy() {
     registers.v_registers[0xB] = 7;
     xor_vx_vy(test, &mut registers.v_registers);
     assert_eq!(registers.v_registers[0xA] , 2)
+}
+
+#[test]
+fn test_jump_v0_addr_nnn() {
+    let mut registers = Registers::new();
+    let test = extract_triple(0xBAD0);
+    registers.v_registers[0] = 2;
+    jump_v0_addr_nnn(test, &mut registers.program_counter, registers.v_registers[0]);
+    assert_eq!(registers.program_counter.0 , 0xAD2)
 }
