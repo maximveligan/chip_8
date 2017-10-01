@@ -61,6 +61,7 @@ enum ThreeArg {
     DrawVxVyNib(TripleNybble), //Dxyn
 }
 
+#[derive(Debug)]
 struct Nybble([u8; 1]);
 
 impl Nybble {
@@ -76,8 +77,10 @@ impl Nybble {
     }
 }
 
+#[derive(Debug)]
 struct DoubleNybble([u8; 1]);
 
+#[derive(Debug)]
 struct TripleNybble([u8; 2]);
 
 impl TripleNybble {
@@ -286,143 +289,143 @@ fn execute(opcode: Opcode) {
 }
 
 fn clear_screen() {  //00E0
-    unimplemented!();
+    println!("Got to opcode {}" , "00E0");
 }
 
 fn ret_subroutine() {  //00EE
-    unimplemented!();
+    println!("Got to opcode {}" , "00EE");
 }
 
 fn sys_address_nnn(addr: TripleNybble) { //0nnn
-    unimplemented!();
+    println!("Got to opcode {:?}" , addr);
 }
 
 fn jump_addr_nnn(addr: TripleNybble) { //1nnn
-    unimplemented!();
+    println!("Got to opcode {:?}" , addr);
 }
 
 fn call_addr_nnn(addr: TripleNybble) { //2nnn
-    unimplemented!();
+    println!("Got to opcode {:?}" , addr);
 }
 
 fn load_i_addr(addr: TripleNybble) { //Annn
-    unimplemented!();
+    println!("Got to opcode {:?}" , addr);
 }
 
 fn jump_v0_addr_nnn(addr: TripleNybble) { //Bnnn
-    unimplemented!();
+    println!("Got to opcode {:?}" , addr);
 }
 
 fn skip_vx_eq_kk(byte_args: TripleNybble) {  //3xkk
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn skip_vx_neq_kk(byte_args: TripleNybble) {  //4xkk
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn skip_vx_eq_vy(byte_args: DoubleNybble) {  // 5xy0
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn load_vx_kk(byte_args: TripleNybble) {  //6xkk
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn load_vy_in_vx(byte_args: DoubleNybble) {  //8xy0
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn or_vx_vy(byte_args: DoubleNybble) {  //8xy3
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn and_vx_vy(byte_args: DoubleNybble) {  //8xy2
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn xor_vx_vy(byte_args: DoubleNybble) {  //8xy3
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn sub_vx_vy_f_nbor(byte_args: DoubleNybble) {  //8xy5
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn shift_r_vx_vy(byte_args: DoubleNybble) {  //8xy6
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
     }
 
 fn sub_vy_vx_f_nbor(byte_args: DoubleNybble) {  //8xy7
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn shift_l_vx_vy(byte_args: DoubleNybble) {  //8xyE
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn skip_vx_neq_vy(byte_args: DoubleNybble) {  //9xy0
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn vx_eq_rand(byte_args: TripleNybble) {  //Cxkk
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn draw_vx_vy_nybble(byte_args: TripleNybble) { //Dxyn
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn skip_if_vx(byte_arg: Nybble) { // Ex9E
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn skip_if_not_vx(byte_arg: Nybble) {  // ExA1
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn load_dt_in_vx(byte_arg: Nybble) {  // Fx07
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn load_key_vx(byte_arg: Nybble) {  // Fx0A
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn load_vx_in_dt(byte_arg: Nybble) {  // Fx15
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn load_vx_in_st(byte_arg: Nybble) {  // Fx18
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn i_plus_eq_vx(byte_arg: Nybble) {  // Fx1E
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn store_dec_vx_in_i(byte_arg: Nybble) {  // Fx33
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn store_vx_v0_in_i(byte_arg: Nybble) {  // Fx55
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 fn read_i_in_vx_v0(byte_arg: Nybble) {  // Fx65
-    unimplemented!();
+    println!("Got to opcode {:?}" , byte_arg);
 }
 
 #[test]
@@ -494,7 +497,7 @@ fn test_decode_op() {
         x += 1;
     }
     loop {
-        decode_op(fetch_opcode(&registers.program_counter, &ram));
+        execute(decode_op(fetch_opcode(&registers.program_counter, &ram)));
         registers.program_counter.update_counter();
         if (registers.program_counter.0 == 70) {
             break;
@@ -505,6 +508,23 @@ fn test_decode_op() {
 #[test]
 fn test_rom_loader() {
     panic!();
+}
+
+#[test]
+fn test_single_extracter() {
+    assert_eq!(extract_single(0xF1AB).0[0] , 1);
+}
+
+#[test]
+fn test_double_extracter() {
+    assert_eq!(extract_double(0xF1AB).0[0] , 0x1A);
+}
+
+#[test]
+fn test_triple_extracter() {
+    let test: TripleNybble = extract_triple(0xF1AB);
+    assert_eq!(test.0[0] , 0x01);
+    assert_eq!(test.0[1] , 0xAB);
 }
 
 #[test]
