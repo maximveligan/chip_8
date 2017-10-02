@@ -273,9 +273,15 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
         Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg, &mut registers.v_registers) , //8xy0
-        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => or_vx_vy(arg, &mut registers.v_registers) , //8xy1
-        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => and_vx_vy(arg, &mut registers.v_registers) , //8xy2
-        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => xor_vx_vy(arg, &mut registers.v_registers) , //8xy3
+        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => {let (x, y) = grab_xy(&arg);
+           let y_reg = registers.v_registers[y as usize];
+           bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitOr::bitor)}, //8xy1
+        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => {let (x, y) = grab_xy(&arg);
+           let y_reg = registers.v_registers[y as usize];
+            bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitAnd::bitand)},
+        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => {let (x, y) = grab_xy(&arg);
+            let y_reg = registers.v_registers[y as usize];
+            bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitXor::bitxor)},
         Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg) , //8xy4
         Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg) , //8xy5
         Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg) , //8xy6
@@ -360,19 +366,8 @@ fn load_vy_in_vx(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy0
     v_registers[x as usize] = v_registers[y as usize];
 }
 
-fn or_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy1
-    let (x, y) = grab_xy(&byte_args);
-    v_registers[x as usize] = (v_registers[x as usize]) | (v_registers[y as usize]);
-}
-
-fn and_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy2
-    let (x, y) = grab_xy(&byte_args);
-    v_registers[x as usize] = (v_registers[x as usize]) & (v_registers[y as usize]);
-}
-
-fn xor_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy3
-    let (x, y) = grab_xy(&byte_args);
-    v_registers[x as usize] = (v_registers[x as usize]) ^ (v_registers[y as usize]);
+fn bitop_vx_vy<T: Copy>(x: &mut T, y: T, bitop: fn(T, T) -> T){  //8xy1
+    *x = bitop(*x,y);
 }
 
 fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
@@ -636,7 +631,8 @@ fn test_or_vx_vy() {
     let test = extract_double(0x0AB0);
     registers.v_registers[0xA] = 1;
     registers.v_registers[0xB] = 3;
-    or_vx_vy(test, &mut registers.v_registers);
+    let y = registers.v_registers[0xB];
+    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitOr::bitor);
     assert_eq!(registers.v_registers[0xA] , 3)
 }
 
@@ -646,7 +642,8 @@ fn test_and_vx_vy() {
     let test = extract_double(0x0AB0);
     registers.v_registers[0xA] = 1;
     registers.v_registers[0xB] = 3;
-    and_vx_vy(test, &mut registers.v_registers);
+    let y = registers.v_registers[0xB];
+    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitAnd::bitand);
     assert_eq!(registers.v_registers[0xA] , 1)
 }
 
@@ -656,7 +653,8 @@ fn test_xor_vx_vy() {
     let test = extract_double(0x0AB0);
     registers.v_registers[0xA] = 5;
     registers.v_registers[0xB] = 7;
-    xor_vx_vy(test, &mut registers.v_registers);
+    let y = registers.v_registers[0xB];
+    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitXor::bitxor);
     assert_eq!(registers.v_registers[0xA] , 2)
 }
 
