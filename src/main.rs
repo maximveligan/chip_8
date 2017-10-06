@@ -1,3 +1,4 @@
+extern crate rand;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -281,7 +282,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::OneArg(OneArg::SetST(arg)) => registers.sound = registers.v_registers[arg.0[0] as usize], // Fx18
         Opcode::OneArg(OneArg::SetI(arg)) =>  registers.i_register += (registers.v_registers[arg.0[0] as usize]) as u16, // Fx1E
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), // Fx29
-        Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(arg), // Fx33
+        Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(ram, registers.i_register, registers.v_registers[arg.0[0] as usize]), // Fx33
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
@@ -294,7 +295,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg) , //8xy6
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg) , //8xy7
         Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg) , //8xyE
-        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg) , //9xy0
+        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.program_counter, &mut registers.v_registers) , //9xy0
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
         Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = triple_nyb_to_addr(&arg),
         Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg, &mut registers.program_counter, stack, &mut registers.sp) , //2nnn
@@ -304,7 +305,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => registers.v_registers[arg.0[0] as usize] += arg.0[1], //7xkk
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => registers.i_register = triple_nyb_to_addr(&arg), //Annn
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg, &mut registers.program_counter, registers.v_registers[0]) , //Bnnn
-        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => vx_eq_rand(arg) , //Cxkk
+        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>(), //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
     }
@@ -368,12 +369,10 @@ fn shift_l_vx_vy(byte_args: DoubleNybble) {  //8xyE
     println!("Got to opcode {:?}" , byte_args);
 }
 
-fn skip_vx_neq_vy(byte_args: DoubleNybble) {  //9xy0
-    println!("Got to opcode {:?}" , byte_args);
-}
-
-fn vx_eq_rand(byte_args: TripleNybble) {  //Cxkk
-    println!("Got to opcode {:?}" , byte_args);
+fn skip_vx_neq_vy(byte_args: DoubleNybble, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {  //9xy0
+    if (v_reg[byte_args.x() as usize] != v_reg[byte_args.y() as usize]) {
+        pc.update_counter();
+    }
 }
 
 fn draw_vx_vy_nybble(byte_args: TripleNybble) { //Dxyn
@@ -396,8 +395,10 @@ fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
     println!("Got to opcode {:?}" , byte_arg);
 }
 
-fn store_dec_vx_in_i(byte_arg: Nybble) {  // Fx33
-    println!("Got to opcode {:?}" , byte_arg);
+fn store_dec_vx_in_i(ram: &mut Ram, i_reg: u16, v_reg: u8) {  // Fx33
+    ram.0[i_reg as usize] = v_reg / 100;
+    ram.0[(i_reg+1) as usize] = (v_reg % 100) / 10;
+    ram.0[(i_reg+2) as usize] = v_reg % 10;
 }
 
 fn store_vx_v0_in_i(byte_arg: Nybble) {  // Fx55
