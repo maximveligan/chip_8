@@ -111,7 +111,7 @@ struct Registers {
     delay: u8,
     sound: u8,
     flag: bool,
-    stack_pointer: u8,
+    sp: u8,
     i_register: u16,
     v_registers: [u8; 15],
 }
@@ -125,7 +125,7 @@ impl Registers {
             sound: 0,
             flag: false,
             i_register: 0,
-            stack_pointer: 0,
+            sp: 0,
             v_registers: [0; 15],
         }
     }
@@ -140,7 +140,14 @@ impl Ram {
 }
 
 struct ProgramCounter(u16);
+ 
+struct Stack([u16; 16]);
 
+impl Stack {
+    fn new() -> Stack {
+        Stack { 0: [0; 16]}
+    }
+}
 impl ProgramCounter {
     fn update_counter(&mut self) {
         self.0 += 2;
@@ -150,6 +157,7 @@ impl ProgramCounter {
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
+    let mut stack: Stack = Stack::new();
     load_rom("dev");
     loop {
         decode_op(fetch_opcode(&registers.program_counter, &ram));
@@ -261,13 +269,13 @@ fn decode_op(opcode: u16) -> Opcode {
     }
 }
 
-fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
+fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut Stack) {
     match opcode {
         Opcode::ZeroArg(ZeroArg::ClearScreen) => clear_screen(), //00E0
-        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(),  //00EE
+        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(&mut registers.program_counter, &stack, &mut registers.sp),  //00EE
         Opcode::OneArg(OneArg::SkipIfVx(arg)) =>  skip_if_vx(arg), // Ex9E
         Opcode::OneArg(OneArg::SkipIfNotVx(arg)) =>  skip_if_not_vx(arg), // ExA1
-        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  load_dt_in_vx(arg), // Fx07
+        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  registers.v_registers[arg.0[0] as usize] = registers.delay, // Fx07
         Opcode::OneArg(OneArg::WaitForKey(arg)) =>  load_key_vx(arg), // Fx0A
         Opcode::OneArg(OneArg::SetDT(arg)) => registers.delay = registers.v_registers[arg.0[0] as usize], // Fx15
         Opcode::OneArg(OneArg::SetST(arg)) => registers.sound = registers.v_registers[arg.0[0] as usize], // Fx18
@@ -287,9 +295,9 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg) , //8xy7
         Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg) , //8xyE
         Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg) , //9xy0
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => sys_address_nnn(arg) , //0nnn
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
         Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = triple_nyb_to_addr(&arg),
-        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
+        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg, &mut registers.program_counter, stack, &mut registers.sp) , //2nnn
         Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //3xkk
         Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //4xkk
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1], //6xkk
@@ -306,16 +314,15 @@ fn clear_screen() {  //00E0
     println!("Got to opcode {}" , "00E0");
 }
 
-fn ret_subroutine() {  //00EE
-    println!("Got to opcode {}" , "00EE");
+fn ret_subroutine(pc: &mut ProgramCounter, stack: &Stack, sp: &mut u8) {  //00EE
+    pc.0 = stack.0[*sp as usize];
+    *sp-=1;
 }
 
-fn sys_address_nnn(addr: TripleNybble) { //0nnn
-    println!("Got to opcode {:?}" , addr);
-}
-
-fn call_addr_nnn(addr: TripleNybble) { //2nnn
-    println!("Got to opcode {:?}" , addr);
+fn call_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, stack: &mut Stack, sp: &mut u8) { //2nnn
+    *sp+=1;
+    stack.0[*sp as usize] = pc.0;
+    pc.0 = triple_nyb_to_addr(&addr);
 }
 
 fn jump_v0_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, v_reg_zero: u8) { //Bnnn
@@ -339,10 +346,6 @@ fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut Progr
     if (v_registers[byte_args.x() as usize] == v_registers[byte_args.y() as usize]) {
         pc.update_counter();
     }
-}
-
-fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
-    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
@@ -385,24 +388,8 @@ fn skip_if_not_vx(byte_arg: Nybble) {  // ExA1
     println!("Got to opcode {:?}" , byte_arg);
 }
 
-fn load_dt_in_vx(byte_arg: Nybble) {  // Fx07
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
 fn load_key_vx(byte_arg: Nybble) {  // Fx0A
     println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn load_vx_in_dt(byte_arg: Nybble) {  // Fx15
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn load_vx_in_st(byte_arg: Nybble) {  // Fx18
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn i_plus_eq_vx(byte_arg: Nybble) {  // Fx1E
-    
 }
 
 fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
