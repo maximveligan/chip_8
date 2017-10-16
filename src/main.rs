@@ -1,3 +1,4 @@
+extern crate rand;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -80,6 +81,16 @@ impl Nybble {
 #[derive(Debug)]
 struct DoubleNybble([u8; 1]);
 
+impl DoubleNybble {
+    fn x(&self) -> u8 {
+        self.0[0] >> 4
+    }
+
+    fn y(&self) -> u8 {
+        self.0[0] & 0x0F
+    }
+}
+
 #[derive(Debug)]
 struct TripleNybble([u8; 2]);
 
@@ -101,7 +112,7 @@ struct Registers {
     delay: u8,
     sound: u8,
     flag: bool,
-    stack_pointer: u8,
+    sp: u8,
     i_register: u16,
     v_registers: [u8; 15],
 }
@@ -115,7 +126,7 @@ impl Registers {
             sound: 0,
             flag: false,
             i_register: 0,
-            stack_pointer: 0,
+            sp: 0,
             v_registers: [0; 15],
         }
     }
@@ -130,16 +141,33 @@ impl Ram {
 }
 
 struct ProgramCounter(u16);
+ 
+struct Stack([u16; 16]);
 
+impl Stack {
+    fn new() -> Stack {
+        Stack { 0: [0; 16]}
+    }
+}
 impl ProgramCounter {
     fn update_counter(&mut self) {
         self.0 += 2;
     }
 }
 
+
+
+//
+//   Keyboard will be hashmap, left is key input, right will be true or false. true for pressed
+//   false for not pressed
+//
+
+
+
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
+    let mut stack: Stack = Stack::new();
     load_rom("dev");
     loop {
         decode_op(fetch_opcode(&registers.program_counter, &ram));
@@ -178,11 +206,6 @@ fn extract_single(opcode: u16) -> Nybble {
 
 fn triple_nyb_to_addr(arg: &TripleNybble) -> u16 {
     ((((arg.0[0] as u16) << 8) | (arg.0[1]) as u16))  
-}
-
-fn grab_xy(arg: &DoubleNybble) -> (u8, u8) {
-    ((arg.0[0] >> 4) , (arg.0[0] & 0x0F))
-
 }
 
 
@@ -256,48 +279,42 @@ fn decode_op(opcode: u16) -> Opcode {
     }
 }
 
-fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers) {
+fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut Stack) {
     match opcode {
         Opcode::ZeroArg(ZeroArg::ClearScreen) => clear_screen(), //00E0
-        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(),  //00EE
+        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => ret_subroutine(&mut registers.program_counter, &stack, &mut registers.sp),  //00EE
         Opcode::OneArg(OneArg::SkipIfVx(arg)) =>  skip_if_vx(arg), // Ex9E
         Opcode::OneArg(OneArg::SkipIfNotVx(arg)) =>  skip_if_not_vx(arg), // ExA1
-        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  load_dt_in_vx(arg), // Fx07
+        Opcode::OneArg(OneArg::SetVxDT(arg)) =>  registers.v_registers[arg.0[0] as usize] = registers.delay, // Fx07
         Opcode::OneArg(OneArg::WaitForKey(arg)) =>  load_key_vx(arg), // Fx0A
-        Opcode::OneArg(OneArg::SetDT(arg)) => load_vx_in_dt(arg), // Fx15
-        Opcode::OneArg(OneArg::SetST(arg)) => load_vx_in_st(arg), // Fx18
-        Opcode::OneArg(OneArg::SetI(arg)) =>  i_plus_eq_vx(arg), // Fx1E
+        Opcode::OneArg(OneArg::SetDT(arg)) => registers.delay = registers.v_registers[arg.0[0] as usize], // Fx15
+        Opcode::OneArg(OneArg::SetST(arg)) => registers.sound = registers.v_registers[arg.0[0] as usize], // Fx18
+        Opcode::OneArg(OneArg::SetI(arg)) =>  registers.i_register += (registers.v_registers[arg.0[0] as usize]) as u16, // Fx1E
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), // Fx29
-        Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(arg), // Fx33
-        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
-        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
+        Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(ram, registers.i_register, registers.v_registers[arg.0[0] as usize]), // Fx33
+        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg, ram, &mut registers.v_registers, &registers.i_register), // Fx55
+        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg, ram, &mut registers.v_registers, &registers.i_register), // Fx65
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => load_vy_in_vx(arg, &mut registers.v_registers) , //8xy0
-        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => {let (x, y) = grab_xy(&arg);
-           let y_reg = registers.v_registers[y as usize];
-           bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitOr::bitor)}, //8xy1
-        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => {let (x, y) = grab_xy(&arg);
-           let y_reg = registers.v_registers[y as usize];
-            bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitAnd::bitand)},
-        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => {let (x, y) = grab_xy(&arg);
-            let y_reg = registers.v_registers[y as usize];
-            bitop_vx_vy(&mut registers.v_registers[x as usize], y_reg, std::ops::BitXor::bitxor)},
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => registers.v_registers[arg.x() as usize] = registers.v_registers[arg.y() as usize], //8xy0
+        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => registers.v_registers[arg.x() as usize] |= registers.v_registers[arg.y() as usize],
+        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => registers.v_registers[arg.x() as usize] &= registers.v_registers[arg.y() as usize],
+        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => registers.v_registers[arg.x() as usize] ^= registers.v_registers[arg.y() as usize],
         Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg, &mut registers.v_registers, &mut registers.flag) , //8xy4
         Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg, &mut registers.v_registers, &mut registers.flag) , //8xy5
-        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg, &mut registers.v_registers, &mut registers.flag) , //8xy6
+        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]), //8xy6
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg, &mut registers.v_registers, &mut registers.flag) , //8xy7
-        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg, &mut registers.v_registers, &mut registers.flag) , //8xyE
-        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.v_registers, &mut registers.program_counter) , //9xy0
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => sys_address_nnn(arg) , //0nnn
-        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => jump_addr_nnn(arg, &mut registers.program_counter) , //1nnn
-        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg) , //2nnn
+        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]) , //8xyE
+        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.program_counter, &mut registers.v_registers) , //9xy0
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
+        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = triple_nyb_to_addr(&arg),
+        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg, &mut registers.program_counter, stack, &mut registers.sp) , //2nnn
         Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //3xkk
         Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //4xkk
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => load_vx_kk(arg, &mut registers.v_registers) , //6xkk
-        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => add_byte_to_vx(arg) , //7xkk
-        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => load_i_addr(arg, &mut registers.i_register) , //Annn
-        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg, &mut registers.program_counter, registers.v_registers[0], ) , //Bnnn
-        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => vx_eq_rand(arg) , //Cxkk
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1], //6xkk
+        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => registers.v_registers[arg.0[0] as usize] += arg.0[1], //7xkk
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => registers.i_register = triple_nyb_to_addr(&arg), //Annn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => registers.program_counter.0 = (registers.v_registers[0] as u16) + triple_nyb_to_addr(&arg), //Bnnn
+        Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>(), //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
     }
@@ -307,31 +324,15 @@ fn clear_screen() {  //00E0
     println!("Got to opcode {}" , "00E0");
 }
 
-fn ret_subroutine() {  //00EE
-    println!("Got to opcode {}" , "00EE");
+fn ret_subroutine(pc: &mut ProgramCounter, stack: &Stack, sp: &mut u8) {  //00EE
+    pc.0 = stack.0[*sp as usize];
+    *sp-=1;
 }
 
-fn sys_address_nnn(addr: TripleNybble) { //0nnn
-    println!("Got to opcode {:?}" , addr);
-}
-
-fn jump_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter) { //1nnn
+fn call_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, stack: &mut Stack, sp: &mut u8) { //2nnn
+    *sp+=1;
+    stack.0[*sp as usize] = pc.0;
     pc.0 = triple_nyb_to_addr(&addr);
-}
-
-fn call_addr_nnn(addr: TripleNybble) { //2nnn
-    println!("Got to opcode {:?}" , addr);
-}
-
-fn load_i_addr(addr: TripleNybble, i_reg: &mut u16) { //Annn
-    *i_reg = triple_nyb_to_addr(&addr);
-}
-
-fn jump_v0_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, v_reg_zero: u8) { //Bnnn
-    pc.0 = (v_reg_zero as u16) + triple_nyb_to_addr(&addr);
-    if (pc.0 % 2 != 0) {
-        panic!("The pc was set to an uneven number. This should be impossible. Current val in V0 = {}", v_reg_zero);
-    }
 }
 
 fn skip_vx_eq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //3xkk
@@ -347,71 +348,46 @@ fn skip_vx_neq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut Prog
 }
 
 fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  // 5xy0
-    let (x, y) = grab_xy(&byte_args);
-    if (v_registers[x as usize] == v_registers[y as usize]) {
+    if (v_registers[byte_args.x() as usize] == v_registers[byte_args.y() as usize]) {
         pc.update_counter();
     }
 }
 
-fn load_vx_kk(byte_args: TripleNybble, v_registers: &mut[u8; 15]) {  //6xkk
-    v_registers[byte_args.0[0] as usize] = byte_args.0[1];
+fn add_vx_vy_f_carry(byte_args: DoubleNybble, y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy4
+    *flag = ((y_reg as u16) + (*x_reg as u16)) & 0xFF00) != 0;
+    *x_reg = ((*x_reg as u16) + (y_reg as u16)) & 0x00FF) as u8;
 }
 
-fn add_byte_to_vx(byte_args: TripleNybble) {  //7xkk
-    println!("Got to opcode {:?}" , byte_args);
+fn sub_vx_vy_f_nbor(byte_args: DoubleNybble, y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy5
+    *flag = *x_reg > y_reg;
+    *x_reg = (*x_reg - y_reg).abs();
 }
 
-fn load_vy_in_vx(byte_args: DoubleNybble, v_registers: &mut [u8; 15]) {  //8xy0
-    let (x, y) = grab_xy(&byte_args);
-    v_registers[x as usize] = v_registers[y as usize];
+fn shift_r_vx_vy(flag: &mut bool, reg_x: &mut u8) { //8xy6
+    *flag = (0b00000001 & *reg_x == 0b00000001);
+    *reg_x /= 2;
 }
 
-fn bitop_vx_vy<T: Copy>(x: &mut T, y: T, bitop: fn(T, T) -> T){  //8xy1
-    *x = bitop(*x,y);
+fn sub_vy_vx_f_nbor(byte_args: DoubleNybble, y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy7
+    *flag = *x_reg < y_reg;
+    *x_reg = (y_reg - *x_reg).abs();
 }
 
-fn add_vx_vy_f_carry(byte_args: DoubleNybble, v_registers: &mut [u8; 15], flag: &mut bool) {  //8xy4
-    let (x, y) = grab_xy(&byte_args); 
-    *flag = ((v_registers[x as usize] + v_registers[y as usize]) & 0xFF00) != 0;
-    v_registers[x as usize] = ((v_registers[x as usize] + v_registers[y as usize]) as u16 & 0x00FF) as u8;
+//  Possible optimization of 8xy6 and 8xyE, extract division and multiplication into higher order
+//  func.
+
+//  Note: Instructioins 8xyE and 8xy6 change depending on the interpreter. Double check for odd
+//  emulator behaviour
+
+fn shift_l_vx_vy(flag: &mut bool, reg_x: &mut u8) {  //8xyE
+    *flag = (0b1000000 & *reg_x == 0b10000000);
+    *reg_x *= 2;
 }
 
-//CHECK FUNCTION: Unsure whether logic is correct...
-fn sub_vx_vy_f_nbor(byte_args: DoubleNybble, v_registers: &mut [u8; 15], flag: &mut bool) {  //8xy5
-    let (x, y) = grab_xy(&byte_args);
-    *flag = v_registers[x as usize] > v_registers[y as usize];
-    v_registers[x as usize] = ((v_registers[x as usize] - v_registers[y as usize]) as u16 & 0x00FF) as u8;
-}
-
-fn shift_r_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15], flag: &mut bool) {  //8xy6
-    let (x,y) = grab_xy(&byte_args);
-    *flag = (v_registers[x as usize] & 0b01) != 0;
-    v_registers[x as usize] = v_registers[x as usize] >> 1;
-    }
-
-//CHECK FUNCTION: Unsure whether logic is correct...
-fn sub_vy_vx_f_nbor(byte_args: DoubleNybble, v_registers: &mut [u8; 15], flag: &mut bool) {  //8xy7
-    let (x, y) = grab_xy(&byte_args);
-    *flag = v_registers[x as usize] < v_registers[y as usize];
-    v_registers[x as usize] = v_registers[y as usize] - v_registers[x as usize];
-}
-
-fn shift_l_vx_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15], flag: &mut bool) {  //8xyE
-    let (x, y) = grab_xy(&byte_args);
-    *flag = (v_registers[x as usize] & 0x80) != 0;
-    v_registers[x as usize] =  v_registers[x as usize] << 1;
-}
-
-fn skip_vx_neq_vy(byte_args: DoubleNybble, v_registers: &mut [u8; 15], pc: &mut ProgramCounter) {  //9xy0
-    let (x, y) = grab_xy(&byte_args);
-    if (v_registers[x as usize] != v_registers[y as usize]) {
+fn skip_vx_neq_vy(byte_args: DoubleNybble, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {  //9xy0
+    if (v_reg[byte_args.x() as usize] != v_reg[byte_args.y() as usize]) {
         pc.update_counter();
     }
-}
-
-//NEED HELP: Unsure of how to set Vx to random byte...
-fn vx_eq_rand(byte_args: TripleNybble) {  //Cxkk
-    println!("Got to opcode {:?}" , byte_args);
 }
 
 fn draw_vx_vy_nybble(byte_args: TripleNybble) { //Dxyn
@@ -426,41 +402,32 @@ fn skip_if_not_vx(byte_arg: Nybble) {  // ExA1
     println!("Got to opcode {:?}" , byte_arg);
 }
 
-fn load_dt_in_vx(byte_arg: Nybble) {  // Fx07
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
 fn load_key_vx(byte_arg: Nybble) {  // Fx0A
     println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn load_vx_in_dt(byte_arg: Nybble) {  // Fx15
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn load_vx_in_st(byte_arg: Nybble) {  // Fx18
-    println!("Got to opcode {:?}" , byte_arg);
-}
-
-fn i_plus_eq_vx(byte_arg: Nybble) {  // Fx1E
-    
 }
 
 fn i_eq_spr_digit_vx(byte_arg: Nybble) {  // Fx29
     println!("Got to opcode {:?}" , byte_arg);
 }
 
-fn store_dec_vx_in_i(byte_arg: Nybble) {  // Fx33
-    println!("Got to opcode {:?}" , byte_arg);
+fn store_dec_vx_in_i(ram: &mut Ram, i_reg: u16, v_reg: u8) {  // Fx33
+    ram.0[i_reg as usize] = v_reg / 100;
+    ram.0[(i_reg+1) as usize] = (v_reg % 100) / 10;
+    ram.0[(i_reg+2) as usize] = v_reg % 10;
 }
 
-fn store_vx_v0_in_i(byte_arg: Nybble) {  // Fx55
-    println!("Got to opcode {:?}" , byte_arg);
+fn store_vx_v0_in_i(byte_arg: Nybble, ram: &mut Ram, v_registers: &mut [u8; 15], i_reg: & u16) {  // Fx55
+    for index in 0..byte_arg.0[0] {
+        v_registers[index as usize] = ram.0[(*i_reg + index as u16) as usize];
+    }
 }
 
-fn read_i_in_vx_v0(byte_arg: Nybble) {  // Fx65
-    println!("Got to opcode {:?}" , byte_arg);
+fn read_i_in_vx_v0(byte_arg: Nybble, ram: &mut Ram, v_registers: &mut [u8; 15], i_reg: & u16) {  // Fx55
+    for index in 0..byte_arg.0[0] {
+        ram.0[(*i_reg + index as u16) as usize] = v_registers[index as usize]
+    }
 }
+
 
 #[test]
 fn test_fetch_opcode() {
