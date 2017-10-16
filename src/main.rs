@@ -155,6 +155,15 @@ impl ProgramCounter {
     }
 }
 
+
+
+//
+//   Keyboard will be hashmap, left is key input, right will be true or false. true for pressed
+//   false for not pressed
+//
+
+
+
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut registers: Registers = Registers::new();
@@ -304,7 +313,7 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1], //6xkk
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => registers.v_registers[arg.0[0] as usize] += arg.0[1], //7xkk
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => registers.i_register = triple_nyb_to_addr(&arg), //Annn
-        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => jump_v0_addr_nnn(arg, &mut registers.program_counter, registers.v_registers[0]) , //Bnnn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => registers.program_counter.0 = (registers.v_registers[0] as u16) + triple_nyb_to_addr(&arg), //Bnnn
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>(), //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
@@ -324,11 +333,6 @@ fn call_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, stack: &mut Stack,
     *sp+=1;
     stack.0[*sp as usize] = pc.0;
     pc.0 = triple_nyb_to_addr(&addr);
-}
-
-fn jump_v0_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, v_reg_zero: u8) { //Bnnn
-    pc.0 = (v_reg_zero as u16) + triple_nyb_to_addr(&addr);
-    assert!((pc.0 % 2 == 0), ("The pc was set to an uneven number. This should be impossible. Current val in V0 = {}", v_reg_zero));
 }
 
 fn skip_vx_eq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //3xkk
