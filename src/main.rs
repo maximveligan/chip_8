@@ -283,8 +283,8 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::OneArg(OneArg::SetI(arg)) =>  registers.i_register += (registers.v_registers[arg.0[0] as usize]) as u16, // Fx1E
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), // Fx29
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => store_dec_vx_in_i(ram, registers.i_register, registers.v_registers[arg.0[0] as usize]), // Fx33
-        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg), // Fx55
-        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg), // Fx65
+        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => store_vx_v0_in_i(arg, ram, &mut registers.v_registers, &registers.i_register), // Fx55
+        Opcode::OneArg(OneArg::ReadV0Vx(arg)) =>  read_i_in_vx_v0(arg, ram, &mut registers.v_registers, &registers.i_register), // Fx65
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &registers.v_registers, &mut registers.program_counter), // 5xy0
         Opcode::TwoArg(TwoArg::VxEqVy(arg)) => registers.v_registers[arg.x() as usize] = registers.v_registers[arg.y() as usize], //8xy0
         Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => registers.v_registers[arg.x() as usize] |= registers.v_registers[arg.y() as usize],
@@ -292,9 +292,9 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => registers.v_registers[arg.x() as usize] ^= registers.v_registers[arg.y() as usize],
         Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg) , //8xy4
         Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg) , //8xy5
-        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(arg) , //8xy6
+        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]), //8xy6
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg) , //8xy7
-        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(arg) , //8xyE
+        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]) , //8xyE
         Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.program_counter, &mut registers.v_registers) , //9xy0
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
         Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = triple_nyb_to_addr(&arg),
@@ -357,16 +357,24 @@ fn sub_vx_vy_f_nbor(byte_args: DoubleNybble) {  //8xy5
     println!("Got to opcode {:?}" , byte_args);
 }
 
-fn shift_r_vx_vy(byte_args: DoubleNybble) {  //8xy6
-    println!("Got to opcode {:?}" , byte_args);
-    }
+//  Possible optimization of 8xy6 and 8xyE, extract division and multiplication into higher order
+//  func.
+
+fn shift_r_vx_vy(flag: &mut bool, reg_x: &mut u8) { //8xy6
+    *flag = (0b00000001 & *reg_x == 0b00000001);
+    *reg_x /= 2;
+}
 
 fn sub_vy_vx_f_nbor(byte_args: DoubleNybble) {  //8xy7
     println!("Got to opcode {:?}" , byte_args);
 }
 
-fn shift_l_vx_vy(byte_args: DoubleNybble) {  //8xyE
-    println!("Got to opcode {:?}" , byte_args);
+//  Note: Instructioins 8xyE and 8xy6 change depending on the interpreter. Double check for odd
+//  emulator behaviour
+
+fn shift_l_vx_vy(flag: &mut bool, reg_x: &mut u8) {  //8xyE
+    *flag = (0b1000000 & *reg_x == 0b10000000);
+    *reg_x *= 2;
 }
 
 fn skip_vx_neq_vy(byte_args: DoubleNybble, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {  //9xy0
@@ -401,13 +409,18 @@ fn store_dec_vx_in_i(ram: &mut Ram, i_reg: u16, v_reg: u8) {  // Fx33
     ram.0[(i_reg+2) as usize] = v_reg % 10;
 }
 
-fn store_vx_v0_in_i(byte_arg: Nybble) {  // Fx55
-    println!("Got to opcode {:?}" , byte_arg);
+fn store_vx_v0_in_i(byte_arg: Nybble, ram: &mut Ram, v_registers: &mut [u8; 15], i_reg: & u16) {  // Fx55
+    for index in 0..byte_arg.0[0] {
+        v_registers[index as usize] = ram.0[(*i_reg + index as u16) as usize];
+    }
 }
 
-fn read_i_in_vx_v0(byte_arg: Nybble) {  // Fx65
-    println!("Got to opcode {:?}" , byte_arg);
+fn read_i_in_vx_v0(byte_arg: Nybble, ram: &mut Ram, v_registers: &mut [u8; 15], i_reg: & u16) {  // Fx55
+    for index in 0..byte_arg.0[0] {
+        ram.0[(*i_reg + index as u16) as usize] = v_registers[index as usize]
+    }
 }
+
 
 #[test]
 fn test_fetch_opcode() {
