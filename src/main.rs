@@ -21,17 +21,17 @@ enum ZeroArg {
 }
 
 enum OneArg {
-    SkipIfVx(Nybble), // Ex9E
-    SkipIfNotVx(Nybble), // ExA1
-    SetVxDT(Nybble), // Fx07
-    WaitForKey(Nybble), // Fx0A
-    SetDT(Nybble), // Fx15
-    SetST(Nybble), // Fx18
-    SetI(Nybble), // Fx1E
-    SetSpriteI(Nybble), // Fx29
-    StoreDecVx(Nybble), // Fx33
-    StoreV0Vx(Nybble), // Fx55
-    ReadV0Vx(Nybble), // Fx65
+    SkipIfVx(Nybble), //Ex9E
+    SkipIfNotVx(Nybble), //ExA1
+    SetVxDT(Nybble), //Fx07
+    WaitForKey(Nybble), //Fx0A
+    SetDT(Nybble), //Fx15
+    SetST(Nybble), //Fx18
+    SetI(Nybble), //Fx1E
+    SetSpriteI(Nybble), //Fx29
+    StoreDecVx(Nybble), //Fx33
+    StoreV0Vx(Nybble), //Fx55
+    ReadV0Vx(Nybble), //Fx65
 }
 
 enum TwoArg {
@@ -142,6 +142,12 @@ impl Ram {
 
 struct ProgramCounter(u16);
  
+impl ProgramCounter {
+    fn update_counter(&mut self) {
+        self.0 += 2;
+    }
+}
+
 struct Stack([u16; 16]);
 
 impl Stack {
@@ -149,20 +155,19 @@ impl Stack {
         Stack { 0: [0; 16]}
     }
 }
-impl ProgramCounter {
-    fn update_counter(&mut self) {
-        self.0 += 2;
+
+struct Screen([[bool; 64]; 32]);
+
+impl Screen {
+    fn new() -> Screen {
+        Screen { 0: [[false; 64]; 32]}
     }
 }
-
-
 
 //
 //   Keyboard will be hashmap, left is key input, right will be true or false. true for pressed
 //   false for not pressed
 //
-
-
 
 fn main() {
     let mut ram: Ram = Ram::new();
@@ -299,10 +304,10 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => registers.v_registers[arg.x() as usize] |= registers.v_registers[arg.y() as usize],
         Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => registers.v_registers[arg.x() as usize] &= registers.v_registers[arg.y() as usize],
         Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => registers.v_registers[arg.x() as usize] ^= registers.v_registers[arg.y() as usize],
-        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(arg) , //8xy4
-        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(arg) , //8xy5
+        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => add_vx_vy_f_carry(registers.v_registers[arg.y() as usize], &mut registers.v_registers[arg.x() as usize], &mut registers.flag) , //8xy4
+        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => sub_vx_vy_f_nbor(registers.v_registers[arg.y() as usize], &mut registers.v_registers[arg.x() as usize], &mut registers.flag) , //8xy5
         Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => shift_r_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]), //8xy6
-        Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(arg) , //8xy7
+        Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => sub_vy_vx_f_nbor(registers.v_registers[arg.y() as usize], &mut registers.v_registers[arg.x() as usize], &mut registers.flag) , //8xy7
         Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]) , //8xyE
         Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.program_counter, &mut registers.v_registers) , //9xy0
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
@@ -353,25 +358,28 @@ fn skip_vx_eq_vy(byte_args: DoubleNybble, v_registers: &[u8; 15], pc: &mut Progr
     }
 }
 
-fn add_vx_vy_f_carry(byte_args: DoubleNybble) {  //8xy4
-    println!("Got to opcode {:?}" , byte_args);
+fn add_vx_vy_f_carry(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy4
+    *flag = (((y_reg as u16) + (*x_reg as u16)) & 0xFF00) != 0;
+    *x_reg = (((*x_reg as u16) + (y_reg as u16)) & 0x00FF) as u8;
 }
 
-fn sub_vx_vy_f_nbor(byte_args: DoubleNybble) {  //8xy5
-    println!("Got to opcode {:?}" , byte_args);
+fn sub_vx_vy_f_nbor(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy5
+    *flag = *x_reg > y_reg;
+    *x_reg = (*x_reg - y_reg);
 }
-
-//  Possible optimization of 8xy6 and 8xyE, extract division and multiplication into higher order
-//  func.
 
 fn shift_r_vx_vy(flag: &mut bool, reg_x: &mut u8) { //8xy6
     *flag = (0b00000001 & *reg_x == 0b00000001);
     *reg_x /= 2;
 }
 
-fn sub_vy_vx_f_nbor(byte_args: DoubleNybble) {  //8xy7
-    println!("Got to opcode {:?}" , byte_args);
+fn sub_vy_vx_f_nbor(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {  //8xy7
+    *flag = *x_reg < y_reg;
+    *x_reg = (y_reg - *x_reg);
 }
+
+//  Possible optimization of 8xy6 and 8xyE, extract division and multiplication into higher order
+//  func.
 
 //  Note: Instructioins 8xyE and 8xy6 change depending on the interpreter. Double check for odd
 //  emulator behaviour
@@ -551,98 +559,5 @@ fn test_rom_ram_loader() {
 }
 
 #[test]
-fn test_skip_vx_eq_kk() {
-    let mut registers = Registers::new();
-    let test = extract_triple(0x5DFA);
-    registers.v_registers[0xD] = 0xFA;
-    skip_vx_eq_kk(test, &registers.v_registers, &mut registers.program_counter);
-    assert_eq!(registers.program_counter.0, 0x202)
-}
-
-#[test]
-fn test_skip_vx_neq_kk() {
-    let mut registers = Registers::new();
-    let test = extract_triple(0x5DFA);
-    registers.v_registers[0xD] = 0xBA;
-    skip_vx_neq_kk(test, &registers.v_registers, &mut registers.program_counter);
-    assert_eq!(registers.program_counter.0, 0x202)
-}
-
-#[test]
-fn test_skip_vx_eq_vy() {
-    let mut registers = Registers::new();
-    let test = extract_double(0x50D0);
-    registers.v_registers[0x0] = 10;
-    registers.v_registers[0xD] = 10;
-    skip_vx_eq_vy(test, &registers.v_registers, &mut registers.program_counter);
-    assert_eq!(registers.program_counter.0, 0x202)
-}
-
-#[test]
-fn test_load_i_addr() { //Annn
-    let mut registers = Registers::new();
-    let test = extract_triple(0xABA0);
-    load_i_addr(test, &mut registers.i_register);
-    assert_eq!(registers.i_register , 0xBA0);
-}
-
-
-#[test]
-fn test_load_vx_kk() {
-    let mut registers = Registers::new();
-    let test = extract_triple(0xB3B0);
-    load_vx_kk(test, &mut registers.v_registers);
-    assert_eq!(registers.v_registers[3], 0xB0)
-}
-
-
-#[test]
-fn test_load_vy_in_vx() {
-    let mut registers = Registers::new();
-    let test = extract_double(0x8AB0);
-    registers.v_registers[0xB] = 0xA;
-    load_vy_in_vx(test, &mut registers.v_registers);
-    assert_eq!(registers.v_registers[0xA] , 0xA)
-}
-
-#[test]
-fn test_or_vx_vy() {
-    let mut registers = Registers::new();
-    let test = extract_double(0x0AB0);
-    registers.v_registers[0xA] = 1;
-    registers.v_registers[0xB] = 3;
-    let y = registers.v_registers[0xB];
-    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitOr::bitor);
-    assert_eq!(registers.v_registers[0xA] , 3)
-}
-
-#[test]
-fn test_and_vx_vy() {
-    let mut registers = Registers::new();
-    let test = extract_double(0x0AB0);
-    registers.v_registers[0xA] = 1;
-    registers.v_registers[0xB] = 3;
-    let y = registers.v_registers[0xB];
-    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitAnd::bitand);
-    assert_eq!(registers.v_registers[0xA] , 1)
-}
-
-#[test]
-fn test_xor_vx_vy() {
-    let mut registers = Registers::new();
-    let test = extract_double(0x0AB0);
-    registers.v_registers[0xA] = 5;
-    registers.v_registers[0xB] = 7;
-    let y = registers.v_registers[0xB];
-    bitop_vx_vy(&mut registers.v_registers[0xA], y, std::ops::BitXor::bitxor);
-    assert_eq!(registers.v_registers[0xA] , 2)
-}
-
-#[test]
-fn test_jump_v0_addr_nnn() {
-    let mut registers = Registers::new();
-    let test = extract_triple(0xBAD0);
-    registers.v_registers[0] = 2;
-    jump_v0_addr_nnn(test, &mut registers.program_counter, registers.v_registers[0]);
-    assert_eq!(registers.program_counter.0 , 0xAD2)
-}
+fn test_execute() {
+} 
