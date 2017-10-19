@@ -78,6 +78,12 @@ impl Nybble {
     }
 }
 
+impl From<u16> for Nybble {
+    fn from(op: u16) -> Nybble {
+        Nybble::new(([((op >> 8) & 0x0F) as u8]))
+    }
+}
+
 #[derive(Debug)]
 struct DoubleNybble([u8; 1]);
 
@@ -88,6 +94,12 @@ impl DoubleNybble {
 
     fn y(&self) -> u8 {
         self.0[0] & 0x0F
+    }
+}
+
+impl From<u16> for DoubleNybble {
+    fn from(op: u16) -> DoubleNybble {
+        DoubleNybble([((op >> 4) & 0x0FF) as u8])
     }
 }
 
@@ -104,6 +116,16 @@ impl TripleNybble {
         } else {
             TripleNybble(argument)
         }
+    }
+    fn to_addr(&self) -> u16 {
+    ((((self.0[0] as u16) << 8) | (self.0[1]) as u16))  
+    }
+
+}
+
+impl From<u16> for TripleNybble {
+    fn from(op: u16) -> TripleNybble {
+        TripleNybble::new(([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8]))
     }
 }
 
@@ -197,90 +219,47 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     (((left_byte as u16) << 8) | (right_byte as u16))
 }
 
-fn extract_triple(opcode: u16) -> TripleNybble {
-    TripleNybble::new(([((opcode & 0x0F00) >> 8) as u8, (opcode & 0x00FF) as u8]))
-}
-
-fn extract_double(opcode: u16) -> DoubleNybble {
-    DoubleNybble([((opcode >> 4) & 0x0FF) as u8])
-}
-
-fn extract_single(opcode: u16) -> Nybble {
-    Nybble::new(([((opcode >> 8) & 0x0F) as u8]))
-}
-
-fn triple_nyb_to_addr(arg: &TripleNybble) -> u16 {
-    ((((arg.0[0] as u16) << 8) | (arg.0[1]) as u16))  
-}
-
+// TODO: Run tests on games and see which opcodes appear most frequently. Reorder this table so
+// that the frequent ones are higher in order
 
 fn decode_op(opcode: u16) -> Opcode {
     match opcode {
         0x00E0 => Opcode::ZeroArg(ZeroArg::ClearScreen),
         0x00EE => Opcode::ZeroArg(ZeroArg::ReturnSubrt),
-        _ => {
-            match (opcode & 0xF000) {
-                0xF000 => {
-                    match (opcode & 0x00F0) {
-                        0x0060 => Opcode::OneArg(OneArg::ReadV0Vx(extract_single(opcode))),
-                        0x0050 => Opcode::OneArg(OneArg::StoreV0Vx(extract_single(opcode))),
-                        0x0030 => Opcode::OneArg(OneArg::StoreDecVx(extract_single(opcode))),
-                        0x0020 => Opcode::OneArg(OneArg::SetSpriteI(extract_single(opcode))),
-                        0x0010 => {
-                            match (opcode & 0x000F) {
-                                0x000E => Opcode::OneArg(OneArg::SetI(extract_single(opcode))),
-                                0x0008 => Opcode::OneArg(OneArg::SetST(extract_single(opcode))),
-                                0x0005 => Opcode::OneArg(OneArg::SetDT(extract_single(opcode))),
-                                _ => panic!("Unsupported or corrupt opcode"),
-                            }
-                        }
-                        0x0000 => {
-                            match (opcode & 0x000F) {
-                                0x000A => Opcode::OneArg(OneArg::WaitForKey(extract_single(opcode))),
-                                0x0007 => Opcode::OneArg(OneArg::SetVxDT(extract_single(opcode))),
-                                _ => panic!("Unsupported or corrupt opcode"),
-                            }
-                        }
-                        _ => panic!("Unsupported or corrupt opcode"),
-                    }
-                }
-                0xE000 => {
-                    match (opcode & 0x00F0) {
-                        0x00A0 => Opcode::OneArg(OneArg::SkipIfNotVx(extract_single(opcode))),
-                        0x0090 => Opcode::OneArg(OneArg::SkipIfVx(extract_single(opcode))),
-                        _ => panic!("unsupported or Corrupt opcode"),
-                    }
-                }
-                0xD000 => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(extract_triple(opcode))),
-                0xC000 => Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(extract_triple(opcode))),
-                0xB000 => Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(extract_triple(opcode))),
-                0xA000 => Opcode::ThreeArg(ThreeArg::SetIToNNN(extract_triple(opcode))),
-                0x9000 => Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(extract_double(opcode))),
-                0x8000 => {
-                    match (opcode & 0x000E) {
-                        0x000E => Opcode::TwoArg(TwoArg::ShiftVxLeft(extract_double(opcode))),
-                        0x0007 => Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(extract_double(opcode))),
-                        0x0006 => Opcode::TwoArg(TwoArg::ShiftVxRight(extract_double(opcode))),
-                        0x0005 => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(extract_double(opcode))),
-                        0x0004 => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(extract_double(opcode))),
-                        0x0003 => Opcode::TwoArg(TwoArg::VxEqVxXORVy(extract_double(opcode))),
-                        0x0002 => Opcode::TwoArg(TwoArg::VxEqVxANDVy(extract_double(opcode))),
-                        0x0001 => Opcode::TwoArg(TwoArg::VxEqVxORVy(extract_double(opcode))),
-                        0x0000 => Opcode::TwoArg(TwoArg::VxEqVy(extract_double(opcode))),
-                        _ => panic!("Unsupported or corrupt opcode"),
-                    }
-                }
-                0x7000 => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(extract_triple(opcode))),
-                0x6000 => Opcode::ThreeArg(ThreeArg::SetVxKK(extract_triple(opcode))),
-                0x5000 => Opcode::TwoArg(TwoArg::SkipEqVxVy(extract_double(opcode))),
-                0x4000 => Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(extract_triple(opcode))), 
-                0x3000 => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(extract_triple(opcode))), 
-                0x2000 => Opcode::ThreeArg(ThreeArg::CallSubAtNNN(extract_triple(opcode))), 
-                0x1000 => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(extract_triple(opcode))), 
-                0x0000 => Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(extract_triple(opcode))),
-                _ => panic!("Unsupported or corrupt opcode"),
-            }
-        }
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0060) => Opcode::OneArg(OneArg::ReadV0Vx(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0050) => Opcode::OneArg(OneArg::StoreV0Vx(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0030) => Opcode::OneArg(OneArg::StoreDecVx(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0020) => Opcode::OneArg(OneArg::SetSpriteI(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0010 && (opcode & 0x000F) == 0x000E) => Opcode::OneArg(OneArg::SetI(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0010 && (opcode & 0x000F) == 0x0008) => Opcode::OneArg(OneArg::SetST(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0010 && (opcode & 0x000F) == 0x0005) => Opcode::OneArg(OneArg::SetDT(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0000 && (opcode & 0x000F) == 0x000A) => Opcode::OneArg(OneArg::WaitForKey(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0000 && (opcode & 0x000F) == 0x0007) => Opcode::OneArg(OneArg::SetVxDT(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x7000) => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x6000) => Opcode::ThreeArg(ThreeArg::SetVxKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x5000) => Opcode::TwoArg(TwoArg::SkipEqVxVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x4000) => Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(TripleNybble::from(opcode))), 
+        opcode if ((opcode & 0xF000) == 0x3000) => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(TripleNybble::from(opcode))), 
+        opcode if ((opcode & 0xF000) == 0x2000) => Opcode::ThreeArg(ThreeArg::CallSubAtNNN(TripleNybble::from(opcode))), 
+        opcode if ((opcode & 0xF000) == 0x1000) => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(TripleNybble::from(opcode))), 
+        opcode if ((opcode & 0xF000) == 0x0000) => Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xE000 && (opcode & 0x00F0) == 0x00A0) => Opcode::OneArg(OneArg::SkipIfNotVx(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xE000 && (opcode & 0x00F0) == 0x0090) => Opcode::OneArg(OneArg::SkipIfVx(Nybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xD000) => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xC000) => Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xB000) => Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0xA000) => Opcode::ThreeArg(ThreeArg::SetIToNNN(TripleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x9000) => Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x000E) => Opcode::TwoArg(TwoArg::ShiftVxLeft(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0007) => Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0006) => Opcode::TwoArg(TwoArg::ShiftVxRight(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0005) => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0004) => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0003) => Opcode::TwoArg(TwoArg::VxEqVxXORVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0002) => Opcode::TwoArg(TwoArg::VxEqVxANDVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0001) => Opcode::TwoArg(TwoArg::VxEqVxORVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0000) => Opcode::TwoArg(TwoArg::VxEqVy(DoubleNybble::from(opcode))),
+        _ => panic!("Unsupported opcode {:X}", opcode), 
     }
 }
 
@@ -311,14 +290,14 @@ fn execute(opcode: Opcode, ram: &mut Ram, registers: &mut Registers, stack: &mut
         Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => shift_l_vx_vy(&mut registers.flag, &mut registers.v_registers[arg.x() as usize]) , //8xyE
         Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => skip_vx_neq_vy(arg, &mut registers.program_counter, &mut registers.v_registers) , //9xy0
         Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
-        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = triple_nyb_to_addr(&arg),
+        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => registers.program_counter.0 = arg.to_addr(),
         Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => call_addr_nnn(arg, &mut registers.program_counter, stack, &mut registers.sp) , //2nnn
         Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => skip_vx_eq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //3xkk
         Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => skip_vx_neq_kk(arg, &registers.v_registers, &mut registers.program_counter) , //4xkk
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1], //6xkk
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => registers.v_registers[arg.0[0] as usize] += arg.0[1], //7xkk
-        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => registers.i_register = triple_nyb_to_addr(&arg), //Annn
-        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => registers.program_counter.0 = (registers.v_registers[0] as u16) + triple_nyb_to_addr(&arg), //Bnnn
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => registers.i_register = arg.to_addr(), //Annn
+        Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => registers.program_counter.0 = (registers.v_registers[0] as u16) + arg.to_addr(), //Bnnn
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => registers.v_registers[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>(), //Cxkk
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg) , //Dxyn
         _ => panic!("Corrupt or unsupported op"),
@@ -337,7 +316,7 @@ fn ret_subroutine(pc: &mut ProgramCounter, stack: &Stack, sp: &mut u8) {  //00EE
 fn call_addr_nnn(addr: TripleNybble, pc: &mut ProgramCounter, stack: &mut Stack, sp: &mut u8) { //2nnn
     *sp+=1;
     stack.0[*sp as usize] = pc.0;
-    pc.0 = triple_nyb_to_addr(&addr);
+    pc.0 = addr.to_addr();
 }
 
 fn skip_vx_eq_kk(byte_args: TripleNybble, v_registers: &[u8; 15], pc: &mut ProgramCounter) {  //3xkk
@@ -446,15 +425,8 @@ fn test_fetch_opcode() {
 }
 
 #[test]
-fn test_jump_addr_nnn() {
-    let mut registers: Registers = Registers::new();
-    jump_addr_nnn(TripleNybble::new([0x0F,0xAC]), &mut registers.program_counter);
-    assert_eq!(registers.program_counter.0, 0x0FAC)
-}
-
-#[test]
-fn test_triple_nyb_to_addr() {
-    assert_eq!(0x0FBA, triple_nyb_to_addr(&TripleNybble::new([0x0F,0xBA])))
+fn test_to_addr() {
+    assert_eq!(0x0FBA, TripleNybble::new([0x0F,0xBA]).to_addr())
 }
 
 #[test]
@@ -529,23 +501,6 @@ fn test_decode_op() {
 #[test]
 fn test_rom_loader() {
     panic!();
-}
-
-#[test]
-fn test_single_extracter() {
-    assert_eq!(extract_single(0xF1AB).0[0] , 1);
-}
-
-#[test]
-fn test_double_extracter() {
-    assert_eq!(extract_double(0xF1AB).0[0] , 0x1A);
-}
-
-#[test]
-fn test_triple_extracter() {
-    let test: TripleNybble = extract_triple(0xF1AB);
-    assert_eq!(test.0[0] , 0x01);
-    assert_eq!(test.0[1] , 0xAB);
 }
 
 #[test]
