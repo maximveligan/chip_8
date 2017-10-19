@@ -15,6 +15,42 @@ enum Opcode {
     ThreeArg(ThreeArg),
 }
 
+const CLEAR_SCREEN: u16 = 0x00E0;
+const RET_SUBROUTINE: u16 = 0x00EE;
+const SKIP_IF_VX: u16 = 0xE09E;
+const SKIP_IF_NOT_VX: u16 = 0xE0A1;
+const SET_VX_DT: u16 = 0xF007;
+const WAIT_FOR_KEY: u16 = 0xF00A;
+const SET_DT: u16 = 0xF015;
+const SET_ST: u16 = 0xF018;
+const SET_I: u16 = 0xF01E;
+const SET_SPRITE_I: u16 = 0xF029;
+const STORE_DEC_VX: u16 = 0xF033;
+const STORE_V0_VX: u16 = 0xF055;
+const READ_V0_VX: u16 = 0xF065;
+const SKIP_VX_EQ_VY: u16 = 0x5000;
+const VX_EQ_VY: u16 = 0x8000;
+const VX_OR_EQ_VY: u16 = 0x8001;
+const VX_AND_EQ_VY: u16 = 0x8002;
+const VX_XOR_EQ_VY: u16 = 0x8003;
+const VX_PLUS_EQ_VY_F: u16 = 0x8004;
+const VX_SUB_EQ_VY_F: u16 = 0x8005;
+const SHIFT_VX_R: u16 = 0x8006;
+const VX_EQ_VY_SUB_VX_F: u16 = 0x8007;
+const SHIFT_VX_L: u16 = 0x800E;
+const SKIP_IF_VX_NOT_VY: u16 = 0x9000;
+const JUMP_TO_CODEROUTE: u16 = 0x0000;
+const JUMP_TO_ADDR: u16 = 0x1000;
+const CALL_SUB_AT_ADDR: u16 = 0x2000;
+const SKIP_VX_EQ_KK: u16 = 0x3000;
+const SKIP_VX_NEQ_KK: u16 = 0x4000;
+const VX_EQ_KK: u16 = 0x6000;
+const VX_PLUS_EQ_KK: u16 = 0x7000;
+const I_EQ_NNN: u16 = 0xA000;
+const PC_EQ_V0_PLUS_NNN: u16 = 0xB000;
+const VX_EQ_RAND_PLUS_KK: u16 = 0xC000;
+const DRAW_VX_VY_NIB: u16 = 0xD000;
+
 enum ZeroArg {
     ClearScreen, //00E0
     ReturnSubrt, //00EE
@@ -61,6 +97,7 @@ enum ThreeArg {
     VxEqRandANDKK(TripleNybble), //Cxkk
     DrawVxVyNib(TripleNybble), //Dxyn
 }
+
 
 #[derive(Debug)]
 struct Nybble([u8; 1]);
@@ -224,41 +261,41 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 
 fn decode_op(opcode: u16) -> Opcode {
     match opcode {
-        0x00E0 => Opcode::ZeroArg(ZeroArg::ClearScreen),
-        0x00EE => Opcode::ZeroArg(ZeroArg::ReturnSubrt),
-        opcode if ((opcode & 0xF060) == 0xF060) => Opcode::OneArg(OneArg::ReadV0Vx(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF050) == 0xF050) => Opcode::OneArg(OneArg::StoreV0Vx(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF030) == 0xF030) => Opcode::OneArg(OneArg::StoreDecVx(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF020) == 0xF020) => Opcode::OneArg(OneArg::SetSpriteI(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF01E) == 0xF01E) => Opcode::OneArg(OneArg::SetI(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF018) == 0xF018) => Opcode::OneArg(OneArg::SetST(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0010 && (opcode & 0x000F) == 0x0005) => Opcode::OneArg(OneArg::SetDT(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0000 && (opcode & 0x000F) == 0x000A) => Opcode::OneArg(OneArg::WaitForKey(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xF000 && (opcode & 0x00F0) == 0x0000 && (opcode & 0x000F) == 0x0007) => Opcode::OneArg(OneArg::SetVxDT(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x7000) => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x6000) => Opcode::ThreeArg(ThreeArg::SetVxKK(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x5000) => Opcode::TwoArg(TwoArg::SkipEqVxVy(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x4000) => Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(TripleNybble::from(opcode))), 
-        opcode if ((opcode & 0xF000) == 0x3000) => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(TripleNybble::from(opcode))), 
-        opcode if ((opcode & 0xF000) == 0x2000) => Opcode::ThreeArg(ThreeArg::CallSubAtNNN(TripleNybble::from(opcode))), 
-        opcode if ((opcode & 0xF000) == 0x1000) => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(TripleNybble::from(opcode))), 
-        opcode if ((opcode & 0xF000) == 0x0000) => Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xE000 && (opcode & 0x00F0) == 0x00A0) => Opcode::OneArg(OneArg::SkipIfNotVx(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xE000 && (opcode & 0x00F0) == 0x0090) => Opcode::OneArg(OneArg::SkipIfVx(Nybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xD000) => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xC000) => Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xB000) => Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0xA000) => Opcode::ThreeArg(ThreeArg::SetIToNNN(TripleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x9000) => Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x000E) => Opcode::TwoArg(TwoArg::ShiftVxLeft(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0007) => Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0006) => Opcode::TwoArg(TwoArg::ShiftVxRight(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0005) => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0004) => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0003) => Opcode::TwoArg(TwoArg::VxEqVxXORVy(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0002) => Opcode::TwoArg(TwoArg::VxEqVxANDVy(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0001) => Opcode::TwoArg(TwoArg::VxEqVxORVy(DoubleNybble::from(opcode))),
-        opcode if ((opcode & 0xF000) == 0x8000 && (opcode & 0x000E) == 0x0000) => Opcode::TwoArg(TwoArg::VxEqVy(DoubleNybble::from(opcode))),
+        CLEAR_SCREEN => Opcode::ZeroArg(ZeroArg::ClearScreen),
+        RET_SUBROUTINE => Opcode::ZeroArg(ZeroArg::ReturnSubrt),
+        opcode if ((opcode & READ_V0_VX) == READ_V0_VX) => Opcode::OneArg(OneArg::ReadV0Vx(Nybble::from(opcode))),
+        opcode if ((opcode & STORE_V0_VX) == STORE_V0_VX) => Opcode::OneArg(OneArg::StoreV0Vx(Nybble::from(opcode))),
+        opcode if ((opcode & STORE_DEC_VX) == STORE_DEC_VX) => Opcode::OneArg(OneArg::StoreDecVx(Nybble::from(opcode))),
+        opcode if ((opcode & SET_SPRITE_I) == SET_SPRITE_I) => Opcode::OneArg(OneArg::SetSpriteI(Nybble::from(opcode))),
+        opcode if ((opcode & SET_I) == SET_I) => Opcode::OneArg(OneArg::SetI(Nybble::from(opcode))),
+        opcode if ((opcode & SET_ST) == SET_ST) => Opcode::OneArg(OneArg::SetST(Nybble::from(opcode))),
+        opcode if ((opcode & SET_DT) == SET_DT) => Opcode::OneArg(OneArg::SetDT(Nybble::from(opcode))),
+        opcode if ((opcode & WAIT_FOR_KEY) == WAIT_FOR_KEY) => Opcode::OneArg(OneArg::WaitForKey(Nybble::from(opcode))),
+        opcode if ((opcode & SET_VX_DT) == SET_VX_DT) => Opcode::OneArg(OneArg::SetVxDT(Nybble::from(opcode))),
+        opcode if ((opcode & VX_PLUS_EQ_KK) == VX_PLUS_EQ_KK) => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & VX_EQ_KK) == VX_EQ_KK) => Opcode::ThreeArg(ThreeArg::SetVxKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & SKIP_VX_EQ_VY) == SKIP_VX_EQ_VY) => Opcode::TwoArg(TwoArg::SkipEqVxVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(TripleNybble::from(opcode))), 
+        opcode if ((opcode & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(TripleNybble::from(opcode))), 
+        opcode if ((opcode & CALL_SUB_AT_ADDR) == CALL_SUB_AT_ADDR) => Opcode::ThreeArg(ThreeArg::CallSubAtNNN(TripleNybble::from(opcode))), 
+        opcode if ((opcode & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(TripleNybble::from(opcode))), 
+        opcode if ((opcode & JUMP_TO_CODEROUTE) == JUMP_TO_CODEROUTE) => Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(TripleNybble::from(opcode))),
+        opcode if ((opcode & SKIP_IF_NOT_VX) == SKIP_IF_NOT_VX) => Opcode::OneArg(OneArg::SkipIfNotVx(Nybble::from(opcode))),
+        opcode if ((opcode & SKIP_IF_VX) == SKIP_IF_VX) => Opcode::OneArg(OneArg::SkipIfVx(Nybble::from(opcode))),
+        opcode if ((opcode & DRAW_VX_VY_NIB) == DRAW_VX_VY_NIB) => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(TripleNybble::from(opcode))),
+        opcode if ((opcode & VX_EQ_RAND_PLUS_KK) == VX_EQ_RAND_PLUS_KK) => Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(TripleNybble::from(opcode))),
+        opcode if ((opcode & PC_EQ_V0_PLUS_NNN) == PC_EQ_V0_PLUS_NNN) => Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(TripleNybble::from(opcode))),
+        opcode if ((opcode & I_EQ_NNN) == I_EQ_NNN) => Opcode::ThreeArg(ThreeArg::SetIToNNN(TripleNybble::from(opcode))),
+        opcode if ((opcode & SKIP_IF_VX_NOT_VY) == SKIP_IF_VX_NOT_VY) => Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & SHIFT_VX_L) == SHIFT_VX_L) => Opcode::TwoArg(TwoArg::ShiftVxLeft(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_EQ_VY_SUB_VX_F) == VX_EQ_VY_SUB_VX_F) => Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & SHIFT_VX_R) == SHIFT_VX_R) => Opcode::TwoArg(TwoArg::ShiftVxRight(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_SUB_EQ_VY_F) == VX_SUB_EQ_VY_F) => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_PLUS_EQ_VY_F) == VX_PLUS_EQ_VY_F) => Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_XOR_EQ_VY) == VX_XOR_EQ_VY) => Opcode::TwoArg(TwoArg::VxEqVxXORVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_AND_EQ_VY) == VX_AND_EQ_VY) => Opcode::TwoArg(TwoArg::VxEqVxANDVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_OR_EQ_VY) == VX_OR_EQ_VY) => Opcode::TwoArg(TwoArg::VxEqVxORVy(DoubleNybble::from(opcode))),
+        opcode if ((opcode & VX_EQ_VY) == VX_EQ_VY) => Opcode::TwoArg(TwoArg::VxEqVy(DoubleNybble::from(opcode))),
         _ => panic!("Unsupported opcode {:X}", opcode), 
     }
 }
