@@ -8,13 +8,6 @@ struct Interpreter {
     regs: Registers,
 }
 
-enum Opcode {
-    ZeroArg(ZeroArg),
-    OneArg(OneArg),
-    TwoArg(TwoArg),
-    ThreeArg(ThreeArg),
-}
-
 const CLEAR_SCREEN: u16 = 0x00E0;
 const RET_SUBROUTINE: u16 = 0x00EE;
 const SKIP_IF_VX: u16 = 0xE09E;
@@ -38,7 +31,7 @@ const VX_SUB_EQ_VY_F: u16 = 0x8005;
 const SHIFT_VX_R: u16 = 0x8006;
 const VX_EQ_VY_SUB_VX_F: u16 = 0x8007;
 const SHIFT_VX_L: u16 = 0x800E;
-const SKIP_IF_VX_NOT_VY: u16 = 0x9000;
+const SKIP_VX_NOT_VY: u16 = 0x9000;
 const JUMP_TO_CODEROUTE: u16 = 0x0000;
 const JUMP_TO_ADDR: u16 = 0x1000;
 const CALL_SUB_AT_ADDR: u16 = 0x2000;
@@ -51,14 +44,21 @@ const PC_EQ_V0_PLUS_NNN: u16 = 0xB000;
 const VX_EQ_RAND_PLUS_KK: u16 = 0xC000;
 const DRAW_VX_VY_NIB: u16 = 0xD000;
 
-enum ZeroArg {
+enum Opcode {
+    NoArg(NoArg),
+    OneArg(OneArg),
+    TwoArg(TwoArg),
+    ThreeArg(ThreeArg),
+}
+
+enum NoArg {
     ClearScreen, //00E0
     ReturnSubrt, //00EE
 }
 
 enum OneArg {
     SkipIfVx(Nybble), //Ex9E
-    SkipIfNotVx(Nybble), //ExA1
+    SkipIfNVx(Nybble), //ExA1
     SetVxDT(Nybble), //Fx07
     WaitForKey(Nybble), //Fx0A
     SetDT(Nybble), //Fx15
@@ -71,31 +71,31 @@ enum OneArg {
 }
 
 enum TwoArg {
-    SkipEqVxVy(DoubleNybble), // 5xy0
-    VxEqVy(DoubleNybble), //8xy0
-    VxEqVxORVy(DoubleNybble), //8xy1
-    VxEqVxANDVy(DoubleNybble), //8xy2
-    VxEqVxXORVy(DoubleNybble), //8xy3
-    VxEqVxPlusVySetF(DoubleNybble), //8xy4
-    VxEqVxSubVySetF(DoubleNybble), //8xy5
-    ShiftVxRight(DoubleNybble), //8xy6
-    VxEqVySubVxSetF(DoubleNybble), //8xy7
-    ShiftVxLeft(DoubleNybble), //8xyE
-    SkipIfVxNotEqVy(DoubleNybble), //9xy0
+    SkipEqVxVy(TwoNybbles), // 5xy0
+    VxEqVy(TwoNybbles), //8xy0
+    VxOREqVy(TwoNybbles), //8xy1
+    VxANDEqVy(TwoNybbles), //8xy2
+    VxXOREqVy(TwoNybbles), //8xy3
+    VxPlusEqVySetF(TwoNybbles), //8xy4
+    VxSubEqVySetF(TwoNybbles), //8xy5
+    ShiftVxR(TwoNybbles), //8xy6
+    VxEqVySubVxSetF(TwoNybbles), //8xy7
+    ShiftVxL(TwoNybbles), //8xyE
+    SkipVxNEqVy(TwoNybbles), //9xy0
 }
 
 enum ThreeArg {
-    JumpToCodeRoutNNN(TripleNybble), //0nnn
-    JumpToAddrNNN(TripleNybble), //1nnn
-    CallSubAtNNN(TripleNybble), //2nnn
-    SkipIfVxEqKK(TripleNybble), //3xkk
-    SkipIfVxNEqKK(TripleNybble), //4xkk
-    SetVxKK(TripleNybble), //6xkk
-    VxEqVxPlusKK(TripleNybble), //7xkk
-    SetIToNNN(TripleNybble), //Annn
-    PCEqNNNPlusV0(TripleNybble), //Bnnn
-    VxEqRandANDKK(TripleNybble), //Cxkk
-    DrawVxVyNib(TripleNybble), //Dxyn
+    JumpToCodeRout(ThreeNybbles), //0nnn
+    JumpToAddr(ThreeNybbles), //1nnn
+    CallSubAt(ThreeNybbles), //2nnn
+    SkipVxEqKK(ThreeNybbles), //3xkk
+    SkipVxNEqKK(ThreeNybbles), //4xkk
+    SetVxKK(ThreeNybbles), //6xkk
+    VxEqVxPlusKK(ThreeNybbles), //7xkk
+    SetIToNNN(ThreeNybbles), //Annn
+    PCEqNNNPlusV0(ThreeNybbles), //Bnnn
+    VxEqRandANDKK(ThreeNybbles), //Cxkk
+    DrawVxVyNib(ThreeNybbles), //Dxyn
 }
 
 
@@ -103,14 +103,11 @@ enum ThreeArg {
 struct Nybble([u8; 1]);
 
 impl Nybble {
-    fn new(argument: [u8; 1]) -> Self {
-        if ((argument[0] & (0b11110000) != 0)) {
-            panic!(
-                "Invalid nybble value: {:X}. Did your nybble get parsed in correctly?",
-                argument[0]
-            );
+    fn new(arg: [u8; 1]) -> Self {
+        if ((arg[0] & (0b11110000) != 0)) {
+            panic!("Invalid nybble value: {:X}", arg[0]);
         } else {
-            Nybble(argument)
+            Nybble(arg)
         }
     }
 }
@@ -122,36 +119,36 @@ impl From<u16> for Nybble {
 }
 
 #[derive(Debug)]
-struct DoubleNybble([u8; 1]);
+struct TwoNybbles([u8; 1]);
 
-impl DoubleNybble {
-    fn x(&self) -> u8 {
-        self.0[0] >> 4
+impl TwoNybbles {
+    fn x(&self) -> usize {
+        (self.0[0] >> 4) as usize
     }
 
-    fn y(&self) -> u8 {
-        self.0[0] & 0x0F
+    fn y(&self) -> usize {
+        (self.0[0] & 0x0F) as usize
     }
 }
 
-impl From<u16> for DoubleNybble {
-    fn from(op: u16) -> DoubleNybble {
-        DoubleNybble([((op >> 4) & 0x0FF) as u8])
+impl From<u16> for TwoNybbles {
+    fn from(op: u16) -> TwoNybbles {
+        TwoNybbles([((op >> 4) & 0x0FF) as u8])
     }
 }
 
 #[derive(Debug)]
-struct TripleNybble([u8; 2]);
+struct ThreeNybbles([u8; 2]);
 
-impl TripleNybble {
-    fn new(argument: [u8; 2]) -> Self {
-        if ((argument[0] & (0b11110000) != 0)) {
+impl ThreeNybbles {
+    fn new(arg: [u8; 2]) -> Self {
+        if ((arg[0] & (0b11110000) != 0)) {
             panic!(
                 "Invalid nybble value: {:X}. Did your three arguments get parsed in correctly?",
-                argument[0]
+                arg[0]
             );
         } else {
-            TripleNybble(argument)
+            ThreeNybbles(arg)
         }
     }
     fn to_addr(&self) -> u16 {
@@ -159,9 +156,9 @@ impl TripleNybble {
     }
 }
 
-impl From<u16> for TripleNybble {
-    fn from(op: u16) -> TripleNybble {
-        TripleNybble::new(([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8]))
+impl From<u16> for ThreeNybbles {
+    fn from(op: u16) -> ThreeNybbles {
+        ThreeNybbles::new(([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8]))
     }
 }
 
@@ -266,9 +263,9 @@ fn load_rom_into_mem(bytes: Vec<u8>, ram: &mut Ram) {
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
-    let left_byte: u8 = ram.0[pc.0 as usize];
-    let right_byte: u8 = ram.0[(pc.0 + 1) as usize];
-    (((left_byte as u16) << 8) | (right_byte as u16))
+    let l_byte: u8 = ram.0[pc.0 as usize];
+    let r_byte: u8 = ram.0[(pc.0 + 1) as usize];
+    ((l_byte as u16) << 8) | (r_byte as u16)
 }
 
 // TODO: Run tests on games and see which opcodes appear most frequently. Reorder this table so
@@ -276,8 +273,8 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
 
 fn decode_op(op: u16) -> Opcode {
     match op {
-        CLEAR_SCREEN => Opcode::ZeroArg(ZeroArg::ClearScreen),
-        RET_SUBROUTINE => Opcode::ZeroArg(ZeroArg::ReturnSubrt),
+        CLEAR_SCREEN => Opcode::NoArg(NoArg::ClearScreen),
+        RET_SUBROUTINE => Opcode::NoArg(NoArg::ReturnSubrt),
         op if ((op & READ_V0_VX) == READ_V0_VX) => Opcode::OneArg(
             OneArg::ReadV0Vx(Nybble::from(op)),
         ),
@@ -298,93 +295,87 @@ fn decode_op(op: u16) -> Opcode {
         ),
         op if ((op & SET_VX_DT) == SET_VX_DT) => Opcode::OneArg(OneArg::SetVxDT(Nybble::from(op))),
         op if ((op & VX_PLUS_EQ_KK) == VX_PLUS_EQ_KK) => Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(
-            TripleNybble::from(op),
+            ThreeNybbles::from(op),
         )),
         op if ((op & VX_EQ_KK) == VX_EQ_KK) => Opcode::ThreeArg(
-            ThreeArg::SetVxKK(TripleNybble::from(op)),
+            ThreeArg::SetVxKK(ThreeNybbles::from(op)),
         ),
         op if ((op & SKIP_VX_EQ_VY) == SKIP_VX_EQ_VY) => Opcode::TwoArg(
-            TwoArg::SkipEqVxVy(DoubleNybble::from(op)),
+            TwoArg::SkipEqVxVy(TwoNybbles::from(op)),
         ),
-        op if ((op & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Opcode::ThreeArg(
-            ThreeArg::SkipIfVxNEqKK(
-                TripleNybble::from(op),
-            ),
-        ), 
-        op if ((op & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(
-            TripleNybble::from(op),
+        op if ((op & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(
+            ThreeNybbles::from(op),
+        )), 
+        op if ((op & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Opcode::ThreeArg(ThreeArg::SkipVxEqKK(
+            ThreeNybbles::from(op),
         )), 
         op if ((op & CALL_SUB_AT_ADDR) == CALL_SUB_AT_ADDR) => Opcode::ThreeArg(
-            ThreeArg::CallSubAtNNN(
-                TripleNybble::from(op),
+            ThreeArg::CallSubAt(
+                ThreeNybbles::from(op),
             ),
         ), 
-        op if ((op & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(
-            TripleNybble::from(op),
-        )), 
+        op if ((op & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Opcode::ThreeArg(
+            ThreeArg::JumpToAddr(ThreeNybbles::from(op)),
+        ), 
         op if ((op & JUMP_TO_CODEROUTE) == JUMP_TO_CODEROUTE) => Opcode::ThreeArg(
-            ThreeArg::JumpToCodeRoutNNN(
-                TripleNybble::from(op),
+            ThreeArg::JumpToCodeRout(
+                ThreeNybbles::from(op),
             ),
         ),
         op if ((op & SKIP_IF_NOT_VX) == SKIP_IF_NOT_VX) => Opcode::OneArg(
-            OneArg::SkipIfNotVx(Nybble::from(op)),
+            OneArg::SkipIfNVx(Nybble::from(op)),
         ),
         op if ((op & SKIP_IF_VX) == SKIP_IF_VX) => Opcode::OneArg(
             OneArg::SkipIfVx(Nybble::from(op)),
         ),
         op if ((op & DRAW_VX_VY_NIB) == DRAW_VX_VY_NIB) => Opcode::ThreeArg(ThreeArg::DrawVxVyNib(
-            TripleNybble::from(op),
+            ThreeNybbles::from(op),
         )),
         op if ((op & VX_EQ_RAND_PLUS_KK) == VX_EQ_RAND_PLUS_KK) => Opcode::ThreeArg(
             ThreeArg::VxEqRandANDKK(
-                TripleNybble::from(op),
+                ThreeNybbles::from(op),
             ),
         ),
         op if ((op & PC_EQ_V0_PLUS_NNN) == PC_EQ_V0_PLUS_NNN) => Opcode::ThreeArg(
             ThreeArg::PCEqNNNPlusV0(
-                TripleNybble::from(op),
+                ThreeNybbles::from(op),
             ),
         ),
         op if ((op & I_EQ_NNN) == I_EQ_NNN) => Opcode::ThreeArg(
-            ThreeArg::SetIToNNN(TripleNybble::from(op)),
+            ThreeArg::SetIToNNN(ThreeNybbles::from(op)),
         ),
-        op if ((op & SKIP_IF_VX_NOT_VY) == SKIP_IF_VX_NOT_VY) => Opcode::TwoArg(
-            TwoArg::SkipIfVxNotEqVy(
-                DoubleNybble::from(op),
-            ),
-        ),
+        op if ((op & SKIP_VX_NOT_VY) == SKIP_VX_NOT_VY) => Opcode::TwoArg(TwoArg::SkipVxNEqVy(
+            TwoNybbles::from(op),
+        )),
         op if ((op & SHIFT_VX_L) == SHIFT_VX_L) => Opcode::TwoArg(
-            TwoArg::ShiftVxLeft(DoubleNybble::from(op)),
+            TwoArg::ShiftVxL(TwoNybbles::from(op)),
         ),
         op if ((op & VX_EQ_VY_SUB_VX_F) == VX_EQ_VY_SUB_VX_F) => Opcode::TwoArg(
             TwoArg::VxEqVySubVxSetF(
-                DoubleNybble::from(op),
+                TwoNybbles::from(op),
             ),
         ),
         op if ((op & SHIFT_VX_R) == SHIFT_VX_R) => Opcode::TwoArg(
-            TwoArg::ShiftVxRight(DoubleNybble::from(op)),
+            TwoArg::ShiftVxR(TwoNybbles::from(op)),
         ),
-        op if ((op & VX_SUB_EQ_VY_F) == VX_SUB_EQ_VY_F) => Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(
-            DoubleNybble::from(op),
+        op if ((op & VX_SUB_EQ_VY_F) == VX_SUB_EQ_VY_F) => Opcode::TwoArg(TwoArg::VxSubEqVySetF(
+            TwoNybbles::from(op),
         )),
         op if ((op & VX_PLUS_EQ_VY_F) == VX_PLUS_EQ_VY_F) => Opcode::TwoArg(
-            TwoArg::VxEqVxPlusVySetF(
-                DoubleNybble::from(op),
+            TwoArg::VxPlusEqVySetF(
+                TwoNybbles::from(op),
             ),
         ),
         op if ((op & VX_XOR_EQ_VY) == VX_XOR_EQ_VY) => Opcode::TwoArg(
-            TwoArg::VxEqVxXORVy(DoubleNybble::from(op)),
+            TwoArg::VxXOREqVy(TwoNybbles::from(op)),
         ),
         op if ((op & VX_AND_EQ_VY) == VX_AND_EQ_VY) => Opcode::TwoArg(
-            TwoArg::VxEqVxANDVy(DoubleNybble::from(op)),
+            TwoArg::VxANDEqVy(TwoNybbles::from(op)),
         ),
         op if ((op & VX_OR_EQ_VY) == VX_OR_EQ_VY) => Opcode::TwoArg(
-            TwoArg::VxEqVxORVy(DoubleNybble::from(op)),
+            TwoArg::VxOREqVy(TwoNybbles::from(op)),
         ),
-        op if ((op & VX_EQ_VY) == VX_EQ_VY) => Opcode::TwoArg(
-            TwoArg::VxEqVy(DoubleNybble::from(op)),
-        ),
+        op if ((op & VX_EQ_VY) == VX_EQ_VY) => Opcode::TwoArg(TwoArg::VxEqVy(TwoNybbles::from(op))),
         _ => panic!("Unsupported op {:X}", op), 
     }
 }
@@ -397,108 +388,100 @@ fn execute(
     screen: &mut Screen,
 ) {
     match opcode {
-        Opcode::ZeroArg(ZeroArg::ClearScreen) => {
+        Opcode::NoArg(NoArg::ClearScreen) => {
             screen.0.iter_mut().for_each(|inner_array| {
                 inner_array.iter_mut().for_each(|pixel| *pixel = false)
             })
-        } //00E0 
-        Opcode::ZeroArg(ZeroArg::ReturnSubrt) => regs.pc = stack.pop(&mut regs.sp), //00EE
-        Opcode::OneArg(OneArg::SkipIfVx(arg)) => skip_if_vx(arg), // Ex9E
-        Opcode::OneArg(OneArg::SkipIfNotVx(arg)) => skip_if_not_vx(arg), // ExA1
-        Opcode::OneArg(OneArg::SetVxDT(arg)) => regs.v_regs[arg.0[0] as usize] = regs.delay, // Fx07
-        Opcode::OneArg(OneArg::WaitForKey(arg)) => load_key_vx(arg), // Fx0A
-        Opcode::OneArg(OneArg::SetDT(arg)) => regs.delay = regs.v_regs[arg.0[0] as usize], // Fx15
-        Opcode::OneArg(OneArg::SetST(arg)) => regs.sound = regs.v_regs[arg.0[0] as usize], // Fx18
-        Opcode::OneArg(OneArg::SetI(arg)) => regs.i_reg += (regs.v_regs[arg.0[0] as usize]) as u16, // Fx1E
-        Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), // Fx29
+        } 
+        Opcode::NoArg(NoArg::ReturnSubrt) => regs.pc = stack.pop(&mut regs.sp), 
+        Opcode::OneArg(OneArg::SkipIfVx(arg)) => skip_if_vx(arg), 
+        Opcode::OneArg(OneArg::SkipIfNVx(arg)) => skip_if_not_vx(arg), 
+        Opcode::OneArg(OneArg::SetVxDT(arg)) => regs.v_regs[arg.0[0] as usize] = regs.delay, 
+        Opcode::OneArg(OneArg::WaitForKey(arg)) => load_key_vx(arg), 
+        Opcode::OneArg(OneArg::SetDT(arg)) => regs.delay = regs.v_regs[arg.0[0] as usize], 
+        Opcode::OneArg(OneArg::SetST(arg)) => regs.sound = regs.v_regs[arg.0[0] as usize], 
+        Opcode::OneArg(OneArg::SetI(arg)) => regs.i_reg += (regs.v_regs[arg.0[0] as usize]) as u16, 
+        Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), 
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
             store_dec_vx_in_i(ram, regs.i_reg, regs.v_regs[arg.0[0] as usize])
-        } // Fx33
+        } 
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
             store_vx_v0_in_i(arg, ram, &mut regs.v_regs, &regs.i_reg)
-        } // Fx55
+        } 
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) => {
             read_i_in_vx_v0(arg, ram, &mut regs.v_regs, &regs.i_reg)
-        } // Fx65
-        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &regs.v_regs, &mut regs.pc), // 5xy0
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => {
-            regs.v_regs[arg.x() as usize] = regs.v_regs[arg.y() as usize]
-        } //8xy0
-        Opcode::TwoArg(TwoArg::VxEqVxORVy(arg)) => {
-            regs.v_regs[arg.x() as usize] |= regs.v_regs[arg.y() as usize]
-        }
-        Opcode::TwoArg(TwoArg::VxEqVxANDVy(arg)) => {
-            regs.v_regs[arg.x() as usize] &= regs.v_regs[arg.y() as usize]
-        }
-        Opcode::TwoArg(TwoArg::VxEqVxXORVy(arg)) => {
-            regs.v_regs[arg.x() as usize] ^= regs.v_regs[arg.y() as usize]
-        }
-        Opcode::TwoArg(TwoArg::VxEqVxPlusVySetF(arg)) => {
+        } 
+        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &regs.v_regs, &mut regs.pc), 
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => regs.v_regs[arg.x()] = regs.v_regs[arg.y()], 
+        Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => regs.v_regs[arg.x()] |= regs.v_regs[arg.y()],
+        Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => regs.v_regs[arg.x()] &= regs.v_regs[arg.y()],
+        Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => regs.v_regs[arg.x()] ^= regs.v_regs[arg.y()],
+        Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
             add_vx_vy_f_carry(
-                regs.v_regs[arg.y() as usize],
-                &mut regs.v_regs[arg.x() as usize],
+                regs.v_regs[arg.y()],
+                &mut regs.v_regs[arg.x()],
                 &mut regs.flag,
             )
-        } //8xy4
-        Opcode::TwoArg(TwoArg::VxEqVxSubVySetF(arg)) => {
+        } 
+        Opcode::TwoArg(TwoArg::VxSubEqVySetF(arg)) => {
             sub_vx_vy_f_nbor(
-                regs.v_regs[arg.y() as usize],
-                &mut regs.v_regs[arg.x() as usize],
+                regs.v_regs[arg.y()],
+                &mut regs.v_regs[arg.x()],
                 &mut regs.flag,
             )
-        } //8xy5
-        Opcode::TwoArg(TwoArg::ShiftVxRight(arg)) => {
-            shift_r_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x() as usize])
-        } //8xy6
+        } 
+        Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
+            shift_r_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x()])
+        } 
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
             sub_vy_vx_f_nbor(
-                regs.v_regs[arg.y() as usize],
-                &mut regs.v_regs[arg.x() as usize],
+                regs.v_regs[arg.y()],
+                &mut regs.v_regs[arg.x()],
                 &mut regs.flag,
             )
-        } //8xy7
-        Opcode::TwoArg(TwoArg::ShiftVxLeft(arg)) => {
-            shift_l_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x() as usize])
-        } //8xyE
-        Opcode::TwoArg(TwoArg::SkipIfVxNotEqVy(arg)) => {
+        } 
+        Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
+            shift_l_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x()])
+        } 
+        Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
             skip_vx_neq_vy(arg, &mut regs.pc, &mut regs.v_regs)
-        } //9xy0
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRoutNNN(arg)) => (), //0nnn
-        Opcode::ThreeArg(ThreeArg::JumpToAddrNNN(arg)) => regs.pc.0 = arg.to_addr(),
-        Opcode::ThreeArg(ThreeArg::CallSubAtNNN(arg)) => stack.push(&mut regs.sp, &regs.pc), //2nnn
-        Opcode::ThreeArg(ThreeArg::SkipIfVxEqKK(arg)) => {
+        } 
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(arg)) => (), 
+        Opcode::ThreeArg(ThreeArg::JumpToAddr(arg)) => regs.pc.0 = arg.to_addr(),
+        Opcode::ThreeArg(ThreeArg::CallSubAt(arg)) => stack.push(&mut regs.sp, &regs.pc), 
+        Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
             skip_vx_eq_kk(arg, &regs.v_regs, &mut regs.pc)
-        } //3xkk
-        Opcode::ThreeArg(ThreeArg::SkipIfVxNEqKK(arg)) => {
+        } 
+        Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => {
             skip_vx_neq_kk(arg, &regs.v_regs, &mut regs.pc)
-        } //4xkk
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => regs.v_regs[arg.0[0] as usize] = arg.0[1], //6xkk
-        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => regs.v_regs[arg.0[0] as usize] += arg.0[1], //7xkk
-        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => regs.i_reg = arg.to_addr(), //Annn
+        } 
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => regs.v_regs[arg.0[0] as usize] = arg.0[1], 
+        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => regs.v_regs[arg.0[0] as usize] += arg.0[1], 
+        Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => regs.i_reg = arg.to_addr(), 
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
             regs.pc.0 = (regs.v_regs[0] as u16) + arg.to_addr()
-        } //Bnnn
+        } 
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
             regs.v_regs[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>()
-        } //Cxkk
-        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg), //Dxyn
+        } 
+        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg), 
         _ => panic!("Corrupt or unsupported op"),
     }
 }
 
-fn skip_vx_eq_kk(byte_args: TripleNybble, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
+fn skip_vx_eq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
     if (v_regs[byte_args.0[0] as usize] == byte_args.0[1]) {
         pc.update();
     }
 }
 
-fn skip_vx_neq_kk(byte_args: TripleNybble, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
+fn skip_vx_neq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
     if (v_regs[byte_args.0[0] as usize] != byte_args.0[1]) {
         pc.update();
     }
 }
 
-fn skip_vx_eq_vy(byte_args: DoubleNybble, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
+fn skip_vx_eq_vy(byte_args: TwoNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
     if (v_regs[byte_args.x() as usize] == v_regs[byte_args.y() as usize]) {
         pc.update();
     }
@@ -511,7 +494,7 @@ fn add_vx_vy_f_carry(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {
 
 fn sub_vx_vy_f_nbor(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {
     *flag = *x_reg > y_reg;
-    *x_reg = (*x_reg - y_reg);
+    *x_reg = x_reg.wrapping_sub(y_reg);
 }
 
 fn shift_r_vx_vy(flag: &mut bool, reg_x: &mut u8) {
@@ -521,7 +504,7 @@ fn shift_r_vx_vy(flag: &mut bool, reg_x: &mut u8) {
 
 fn sub_vy_vx_f_nbor(y_reg: u8, x_reg: &mut u8, flag: &mut bool) {
     *flag = *x_reg < y_reg;
-    *x_reg = (y_reg - *x_reg);
+    *x_reg = y_reg.wrapping_sub(*x_reg);
 }
 
 //  Possible optimization of 8xy6 and 8xyE, extract division and multiplication into higher order
@@ -535,13 +518,13 @@ fn shift_l_vx_vy(flag: &mut bool, reg_x: &mut u8) {
     *reg_x *= 2;
 }
 
-fn skip_vx_neq_vy(byte_args: DoubleNybble, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {
+fn skip_vx_neq_vy(byte_args: TwoNybbles, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {
     if (v_reg[byte_args.x() as usize] != v_reg[byte_args.y() as usize]) {
         pc.update();
     }
 }
 
-fn draw_vx_vy_nybble(byte_args: TripleNybble) {
+fn draw_vx_vy_nybble(byte_args: ThreeNybbles) {
     println!("Got to opcode {:?}", byte_args);
 }
 
@@ -593,7 +576,7 @@ fn test_fetch_opcode() {
 
 #[test]
 fn test_to_addr() {
-    assert_eq!(0x0FBA, TripleNybble::new([0x0F, 0xBA]).to_addr())
+    assert_eq!(0x0FBA, ThreeNybbles::new([0x0F, 0xBA]).to_addr())
 }
 
 #[test]
@@ -605,7 +588,7 @@ fn test_nybble() {
 #[test]
 #[should_panic]
 fn test_triple_nybble() {
-    let tnybble: TripleNybble = TripleNybble::new([0xFA, 0xFD]);
+    let tnybble: ThreeNybbles = ThreeNybbles::new([0xFA, 0xFD]);
 }
 
 #[test]
