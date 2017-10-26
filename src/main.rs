@@ -336,24 +336,24 @@ fn execute(
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => skip_if_vx(arg, keyboard, &mut regs.pc), 
         Opcode::OneArg(OneArg::SkipIfNVx(arg)) => skip_if_not_vx(arg, keyboard, &mut regs.pc), 
         Opcode::OneArg(OneArg::SetVxDT(arg)) => {
-            regs.v_regs[arg.to_usize().expect("Check u8")] = regs.delay
+            regs.v_regs[arg.to_usize().expect("Check usize")] = regs.delay
         } 
         Opcode::OneArg(OneArg::WaitForKey(arg)) => load_key_vx(arg), 
         Opcode::OneArg(OneArg::SetDT(arg)) => {
-            regs.delay = regs.v_regs[arg.to_usize().expect("Check u8")]
+            regs.delay = regs.v_regs[arg.to_usize().expect("Check usize")]
         } 
         Opcode::OneArg(OneArg::SetST(arg)) => {
-            regs.sound = regs.v_regs[arg.to_usize().expect("Check u8")]
+            regs.sound = regs.v_regs[arg.to_usize().expect("Check usize")]
         } 
         Opcode::OneArg(OneArg::SetI(arg)) => {
-            regs.i_reg += (regs.v_regs[arg.to_usize().expect("Check u8")]) as u16
+            regs.i_reg += (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16
         } 
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), 
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
             store_dec_vx_in_i(
                 ram,
                 regs.i_reg,
-                regs.v_regs[arg.to_usize().expect("Check u8")],
+                regs.v_regs[arg.to_usize().expect("Check usize")],
             )
         } 
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
@@ -364,52 +364,52 @@ fn execute(
         } 
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &regs.v_regs, &mut regs.pc), 
         Opcode::TwoArg(TwoArg::VxEqVy(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8")] =
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.y().to_usize().expect("Check usize")]
         } 
         Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8")] |=
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] |=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")]
         }
         Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8")] &=
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] &=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")]
         }
         Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8")] ^=
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] ^=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")]
         }
         Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
             add_vx_vy_f_carry(
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
-                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check usize")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::VxSubEqVySetF(arg)) => {
             sub_vx_vy_f_nbor(
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
-                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check usize")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
             shift_r_vx_vy(
                 &mut regs.flag,
-                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check usize")],
             )
         } 
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
             sub_vy_vx_f_nbor(
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
-                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check usize")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
             shift_l_vx_vy(
                 &mut regs.flag,
-                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check usize")],
             )
         } 
         Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
@@ -425,10 +425,10 @@ fn execute(
             skip_vx_neq_kk(arg, &regs.v_regs, &mut regs.pc)
         } 
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8") as usize] = arg.get_byte()
+            regs.v_regs[arg.x().to_usize().expect("Check usize") as usize] = arg.get_byte()
         } 
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check u8")] += arg.get_byte()
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] += arg.get_byte()
         } 
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => regs.i_reg = arg.to_addr(), 
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
@@ -446,13 +446,13 @@ fn execute(
 //  Possible optimization of next three, abstract into higher order function
 
 fn skip_vx_eq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
-    if (v_regs[byte_args.x().to_usize().expect("Check u8")] == byte_args.get_byte()) {
+    if (v_regs[byte_args.x().to_usize().expect("Check usize")] == byte_args.get_byte()) {
         pc.update();
     }
 }
 
 fn skip_vx_neq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
-    if (v_regs[byte_args.x().to_usize().expect("Check u8")] != byte_args.get_byte()) {
+    if (v_regs[byte_args.x().to_usize().expect("Check usize")] != byte_args.get_byte()) {
         pc.update();
     }
 }
