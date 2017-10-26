@@ -1,13 +1,18 @@
+extern crate num;
 extern crate rand;
+use nybble::Nybble;
+use num::ToPrimitive;
+use nybble::TwoNybbles;
+use nybble::ThreeNybbles;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-struct Interpreter {
-    regs: Registers,
-}
+mod nybble;
 
+const SCREEN_WIDTH: usize = 64;
+const SCREEN_HEIGHT: usize = 32;
 const CLEAR_SCREEN: u16 = 0x00E0;
 const RET_SUBROUTINE: u16 = 0x00EE;
 const SKIP_IF_VX: u16 = 0xE09E;
@@ -100,68 +105,6 @@ enum ThreeArg {
 
 
 #[derive(Debug)]
-struct Nybble([u8; 1]);
-
-impl Nybble {
-    fn new(arg: [u8; 1]) -> Self {
-        if ((arg[0] & (0b11110000) != 0)) {
-            panic!("Invalid nybble value: {:X}", arg[0]);
-        } else {
-            Nybble(arg)
-        }
-    }
-}
-
-impl From<u16> for Nybble {
-    fn from(op: u16) -> Nybble {
-        Nybble::new(([((op >> 8) & 0x0F) as u8]))
-    }
-}
-
-#[derive(Debug)]
-struct TwoNybbles([u8; 1]);
-
-impl TwoNybbles {
-    fn x(&self) -> usize {
-        (self.0[0] >> 4) as usize
-    }
-
-    fn y(&self) -> usize {
-        (self.0[0] & 0x0F) as usize
-    }
-}
-
-impl From<u16> for TwoNybbles {
-    fn from(op: u16) -> TwoNybbles {
-        TwoNybbles([((op >> 4) & 0x0FF) as u8])
-    }
-}
-
-#[derive(Debug)]
-struct ThreeNybbles([u8; 2]);
-
-impl ThreeNybbles {
-    fn new(arg: [u8; 2]) -> Self {
-        if ((arg[0] & (0b11110000) != 0)) {
-            panic!(
-                "Invalid nybble value: {:X}. Did your three arguments get parsed in correctly?",
-                arg[0]
-            );
-        } else {
-            ThreeNybbles(arg)
-        }
-    }
-    fn to_addr(&self) -> u16 {
-        ((((self.0[0] as u16) << 8) | (self.0[1]) as u16))
-    }
-}
-
-impl From<u16> for ThreeNybbles {
-    fn from(op: u16) -> ThreeNybbles {
-        ThreeNybbles::new(([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8]))
-    }
-}
-
 struct Registers {
     pc: ProgramCounter,
     delay: u8,
@@ -195,6 +138,7 @@ impl Ram {
     }
 }
 
+#[derive(Debug)]
 struct ProgramCounter(u16);
 
 impl ProgramCounter {
@@ -214,10 +158,6 @@ impl Stack {
         self.0[*sp as usize] = pc.0;
     }
 
-    //  Optional: Delete the data that was popped. By default, right now only the pointer to it gets
-    //  deleted. The next time the SP tries to point at the popped stack data, it will simply be
-    //  overwritten
-
     fn pop(&self, sp: &mut u8) -> ProgramCounter {
         let temp = ProgramCounter(self.0[*sp as usize]);
         *sp = *sp - 1;
@@ -225,41 +165,39 @@ impl Stack {
     }
 }
 
-struct Screen([[bool; 64]; 32]);
+struct Screen([[bool; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 
 impl Screen {
     fn new() -> Screen {
-        Screen { 0: [[false; 64]; 32] }
+        Screen { 0: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT] }
     }
 }
 
-//
-//   Keyboard will be hashmap, left is key input, right will be true or false. true for pressed
-//   false for not pressed
-//
+struct Keyboard([bool; 0xF + 1]);
+
+impl Keyboard {
+    fn new() -> Keyboard {
+        Keyboard { 0: [false; 0xF + 1] }
+    }
+}
 
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut regs: Registers = Registers::new();
     let mut stack: Stack = Stack::new();
-    load_rom("dev");
     loop {
         decode_op(fetch_opcode(&regs.pc, &ram));
         regs.pc.update();
     }
 }
 
-fn load_rom(file: &str) -> Vec<u8> {
+fn load_rom(file: &str, ram: &mut Ram) {
     let mut rom = File::open(file).expect("Rom not found");
     let mut raw_bytes = Vec::new();
     rom.read_to_end(&mut raw_bytes).expect(
         "Something went wrong while reading the rom",
     );
-    raw_bytes
-}
-
-fn load_rom_into_mem(bytes: Vec<u8>, ram: &mut Ram) {
-    &ram.0[0x200..0xFFF].copy_from_slice(&bytes);
+    &ram.0[0x200..0xFFF].copy_from_slice(&raw_bytes);
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
@@ -386,6 +324,7 @@ fn execute(
     regs: &mut Registers,
     stack: &mut Stack,
     screen: &mut Screen,
+    keyboard: &mut Keyboard,
 ) {
     match opcode {
         Opcode::NoArg(NoArg::ClearScreen) => {
@@ -394,16 +333,28 @@ fn execute(
             })
         } 
         Opcode::NoArg(NoArg::ReturnSubrt) => regs.pc = stack.pop(&mut regs.sp), 
-        Opcode::OneArg(OneArg::SkipIfVx(arg)) => skip_if_vx(arg), 
-        Opcode::OneArg(OneArg::SkipIfNVx(arg)) => skip_if_not_vx(arg), 
-        Opcode::OneArg(OneArg::SetVxDT(arg)) => regs.v_regs[arg.0[0] as usize] = regs.delay, 
+        Opcode::OneArg(OneArg::SkipIfVx(arg)) => skip_if_vx(arg, keyboard, &mut regs.pc), 
+        Opcode::OneArg(OneArg::SkipIfNVx(arg)) => skip_if_not_vx(arg, keyboard, &mut regs.pc), 
+        Opcode::OneArg(OneArg::SetVxDT(arg)) => {
+            regs.v_regs[arg.to_usize().expect("Check u8")] = regs.delay
+        } 
         Opcode::OneArg(OneArg::WaitForKey(arg)) => load_key_vx(arg), 
-        Opcode::OneArg(OneArg::SetDT(arg)) => regs.delay = regs.v_regs[arg.0[0] as usize], 
-        Opcode::OneArg(OneArg::SetST(arg)) => regs.sound = regs.v_regs[arg.0[0] as usize], 
-        Opcode::OneArg(OneArg::SetI(arg)) => regs.i_reg += (regs.v_regs[arg.0[0] as usize]) as u16, 
+        Opcode::OneArg(OneArg::SetDT(arg)) => {
+            regs.delay = regs.v_regs[arg.to_usize().expect("Check u8")]
+        } 
+        Opcode::OneArg(OneArg::SetST(arg)) => {
+            regs.sound = regs.v_regs[arg.to_usize().expect("Check u8")]
+        } 
+        Opcode::OneArg(OneArg::SetI(arg)) => {
+            regs.i_reg += (regs.v_regs[arg.to_usize().expect("Check u8")]) as u16
+        } 
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), 
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
-            store_dec_vx_in_i(ram, regs.i_reg, regs.v_regs[arg.0[0] as usize])
+            store_dec_vx_in_i(
+                ram,
+                regs.i_reg,
+                regs.v_regs[arg.to_usize().expect("Check u8")],
+            )
         } 
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
             store_vx_v0_in_i(arg, ram, &mut regs.v_regs, &regs.i_reg)
@@ -412,36 +363,54 @@ fn execute(
             read_i_in_vx_v0(arg, ram, &mut regs.v_regs, &regs.i_reg)
         } 
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => skip_vx_eq_vy(arg, &regs.v_regs, &mut regs.pc), 
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => regs.v_regs[arg.x()] = regs.v_regs[arg.y()], 
-        Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => regs.v_regs[arg.x()] |= regs.v_regs[arg.y()],
-        Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => regs.v_regs[arg.x()] &= regs.v_regs[arg.y()],
-        Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => regs.v_regs[arg.x()] ^= regs.v_regs[arg.y()],
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8")] =
+                regs.v_regs[arg.y().to_usize().expect("Check usize")]
+        } 
+        Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8")] |=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")]
+        }
+        Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8")] &=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")]
+        }
+        Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8")] ^=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")]
+        }
         Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
             add_vx_vy_f_carry(
-                regs.v_regs[arg.y()],
-                &mut regs.v_regs[arg.x()],
+                regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::VxSubEqVySetF(arg)) => {
             sub_vx_vy_f_nbor(
-                regs.v_regs[arg.y()],
-                &mut regs.v_regs[arg.x()],
+                regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
-            shift_r_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x()])
+            shift_r_vx_vy(
+                &mut regs.flag,
+                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+            )
         } 
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
             sub_vy_vx_f_nbor(
-                regs.v_regs[arg.y()],
-                &mut regs.v_regs[arg.x()],
+                regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
                 &mut regs.flag,
             )
         } 
         Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
-            shift_l_vx_vy(&mut regs.flag, &mut regs.v_regs[arg.x()])
+            shift_l_vx_vy(
+                &mut regs.flag,
+                &mut regs.v_regs[arg.x().to_usize().expect("Check u8")],
+            )
         } 
         Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
             skip_vx_neq_vy(arg, &mut regs.pc, &mut regs.v_regs)
@@ -455,34 +424,43 @@ fn execute(
         Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => {
             skip_vx_neq_kk(arg, &regs.v_regs, &mut regs.pc)
         } 
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => regs.v_regs[arg.0[0] as usize] = arg.0[1], 
-        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => regs.v_regs[arg.0[0] as usize] += arg.0[1], 
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8") as usize] = arg.get_byte()
+        } 
+        Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check u8")] += arg.get_byte()
+        } 
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => regs.i_reg = arg.to_addr(), 
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
             regs.pc.0 = (regs.v_regs[0] as u16) + arg.to_addr()
         } 
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
-            regs.v_regs[arg.0[0] as usize] = arg.0[1] & rand::random::<u8>()
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] = arg.get_byte() &
+                rand::random::<u8>()
         } 
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg), 
         _ => panic!("Corrupt or unsupported op"),
     }
 }
 
+//  Possible optimization of next three, abstract into higher order function
+
 fn skip_vx_eq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
-    if (v_regs[byte_args.0[0] as usize] == byte_args.0[1]) {
+    if (v_regs[byte_args.x().to_usize().expect("Check u8")] == byte_args.get_byte()) {
         pc.update();
     }
 }
 
 fn skip_vx_neq_kk(byte_args: ThreeNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
-    if (v_regs[byte_args.0[0] as usize] != byte_args.0[1]) {
+    if (v_regs[byte_args.x().to_usize().expect("Check u8")] != byte_args.get_byte()) {
         pc.update();
     }
 }
 
 fn skip_vx_eq_vy(byte_args: TwoNybbles, v_regs: &[u8; 15], pc: &mut ProgramCounter) {
-    if (v_regs[byte_args.x() as usize] == v_regs[byte_args.y() as usize]) {
+    if (v_regs[byte_args.x().to_usize().expect("Check usize")] ==
+            v_regs[byte_args.y().to_usize().expect("Check usize")])
+    {
         pc.update();
     }
 }
@@ -519,7 +497,9 @@ fn shift_l_vx_vy(flag: &mut bool, reg_x: &mut u8) {
 }
 
 fn skip_vx_neq_vy(byte_args: TwoNybbles, pc: &mut ProgramCounter, v_reg: &mut [u8; 15]) {
-    if (v_reg[byte_args.x() as usize] != v_reg[byte_args.y() as usize]) {
+    if (v_reg[byte_args.x().to_usize().expect("Check usize")] !=
+            v_reg[byte_args.y().to_usize().expect("Check usize")])
+    {
         pc.update();
     }
 }
@@ -528,12 +508,16 @@ fn draw_vx_vy_nybble(byte_args: ThreeNybbles) {
     println!("Got to opcode {:?}", byte_args);
 }
 
-fn skip_if_vx(byte_arg: Nybble) {
-    println!("Got to opcode {:?}", byte_arg);
+fn skip_if_vx(byte_arg: Nybble, keyboard: &mut Keyboard, pc: &mut ProgramCounter) {
+    if (keyboard.0[byte_arg.to_usize().expect("Check usize")]) {
+        pc.update();
+    }
 }
 
-fn skip_if_not_vx(byte_arg: Nybble) {
-    println!("Got to opcode {:?}", byte_arg);
+fn skip_if_not_vx(byte_arg: Nybble, keyboard: &mut Keyboard, pc: &mut ProgramCounter) {
+    if (!keyboard.0[byte_arg.to_usize().expect("Check usize")]) {
+        pc.update();
+    }
 }
 
 fn load_key_vx(byte_arg: Nybble) {
@@ -551,13 +535,13 @@ fn store_dec_vx_in_i(ram: &mut Ram, i_reg: u16, v_reg: u8) {
 }
 
 fn store_vx_v0_in_i(byte_arg: Nybble, ram: &mut Ram, v_regs: &mut [u8; 15], i_reg: &u16) {
-    for index in 0..byte_arg.0[0] {
+    for index in 0..byte_arg.to_usize().expect("Check usize") {
         v_regs[index as usize] = ram.0[(*i_reg + index as u16) as usize];
     }
 }
 
 fn read_i_in_vx_v0(byte_arg: Nybble, ram: &mut Ram, v_regs: &mut [u8; 15], i_reg: &u16) {
-    for index in 0..byte_arg.0[0] {
+    for index in 0..byte_arg.to_u64().expect("Check to_u64") {
         ram.0[(*i_reg + index as u16) as usize] = v_regs[index as usize]
     }
 }
@@ -703,6 +687,7 @@ fn test_clear_screen() {
     let mut regs: Registers = Registers::new();
     let mut stack: Stack = Stack::new();
     let mut screen: Screen = Screen::new();
+    let mut keyboard: Keyboard = Keyboard::new();
     screen.0[0][0] = true;
     execute(
         decode_op(CLEAR_SCREEN),
@@ -710,6 +695,7 @@ fn test_clear_screen() {
         &mut regs,
         &mut stack,
         &mut screen,
+        &mut keyboard,
     );
     screen.0.iter().for_each(|inner_array| {
         inner_array.iter().for_each(
