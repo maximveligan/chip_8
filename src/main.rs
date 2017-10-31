@@ -1,6 +1,7 @@
 extern crate num;
 extern crate rand;
 use nybble::Nybble;
+use num::range_inclusive;
 use num::ToPrimitive;
 use nybble::TwoNybbles;
 use nybble::ThreeNybbles;
@@ -13,22 +14,22 @@ mod nybble;
 
 // SPR stands for SPRITE
 
-const SPR_ZERO_START: u8 =  00;
-const SPR_ONE_START: u8 =   05;
-const SPR_TWO_START: u8 =   10;
-const SPR_THREE_START: u8 = 15;
-const SPR_FOUR_START: u8 =  20;
-const SPR_FIVE_START: u8 =  25;
-const SPR_SIX_START: u8 =   30;
-const SPR_SEVEN_START: u8 = 35;
-const SPR_EIGHT_START: u8 = 40;
-const SPR_NINE_START: u8 =  45;
-const SPR_A_START: u8 =     50;
-const SPR_B_START: u8 =     55;
-const SPR_C_START: u8 =     60;
-const SPR_D_START: u8 =     65;
-const SPR_E_START: u8 =     70;
-const SPR_F_START: u8 =     75;
+const SPR_ZERO_START:   u16 = 0000;
+const SPR_ONE_START:    u16 = 0005;
+const SPR_TWO_START:    u16 = 0010;
+const SPR_THREE_START:  u16 = 0015;
+const SPR_FOUR_START:   u16 = 0020;
+const SPR_FIVE_START:   u16 = 0025;
+const SPR_SIX_START:    u16 = 0030;
+const SPR_SEVEN_START:  u16 = 0035;
+const SPR_EIGHT_START:  u16 = 0040;
+const SPR_NINE_START:   u16 = 0045;
+const SPR_A_START:      u16 = 0050;
+const SPR_B_START:      u16 = 0055;
+const SPR_C_START:      u16 = 0060;
+const SPR_D_START:      u16 = 0065;
+const SPR_E_START:      u16 = 0070;
+const SPR_F_START:      u16 = 0075;
 
 const SPR_ZERO:  [u8; 5] = [0xF0, 0x90, 0x90, 0x90, 0xF0];
 const SPR_ONE:   [u8; 5] = [0x20, 0x60, 0x20, 0x20, 0x70];
@@ -146,6 +147,8 @@ enum InvalidOpcode {
     StackOverflow(ProgramCounter, Stack),
     OutOfBoundsAddress(u16, Argument, ProgramCounter),
     UnevenAddress(u16, Argument, ProgramCounter),
+    NoSuchDigitSprite(u16, Argument, ProgramCounter),
+    OutOfScreenBounds(u16, Argument, ProgramCounter),
 }
 
 struct Argument(u16);
@@ -422,7 +425,7 @@ fn execute(
         Opcode::OneArg(OneArg::SetI(arg)) => {
             regs.i_reg += (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16
         } 
-        Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(arg), 
+        Opcode::OneArg(OneArg::SetSpriteI(arg)) => i_eq_spr_digit_vx(regs.v_regs[arg.to_usize().expect("Check usize")], &mut regs.i_reg), 
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
             store_dec_vx_in_i(
                 ram,
@@ -502,7 +505,7 @@ fn execute(
             regs.v_regs[arg.x().to_usize().expect("Check usize")] = arg.get_byte() &
                 rand::random::<u8>()
         } 
-        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg), 
+        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => draw_vx_vy_nybble(arg.get_byte(), regs.v_regs[arg.x().to_usize().expect("Check usize")], regs.v_regs[arg.y().to_usize().expect("Check usize")], regs.i_reg, &mut regs.v_regs[FLAG_REG], ram, screen), 
         _ => unimplemented!("Please write error handler for invalid opcodes"), //TODO: handle invalid ops
     }
 }
@@ -536,8 +539,15 @@ fn skip_vx_neq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter,) {
     }
 }
 
-fn draw_vx_vy_nybble(byte_args: ThreeNybbles) {
-    println!("Got to opcode {:?}", byte_args);
+fn draw_vx_vy_nybble(byte_num: u8, v_x: u8, v_y: u8, i_reg: u16, flag: &mut u8, ram: &mut Ram, screen: &mut Screen) {
+    for byte in range_inclusive(0, byte_num) {
+        for index in range_inclusive(0, 7) {
+            if (*flag != 1 && screen.0[(v_y + byte) as usize][(v_x + index) as usize] == true && get_bit(ram.0[i_reg as usize], index) == true) {
+                *flag = 1;
+            }
+            screen.0[(v_y + byte) as usize][(v_x + index) as usize] ^= get_bit(ram.0[i_reg as usize], index)
+        }
+    }
 }
 
 fn skip_if_vx(byte_arg: Nybble, keyboard: &mut Keyboard, pc: &mut ProgramCounter) {
@@ -556,8 +566,26 @@ fn load_key_vx(byte_arg: Nybble) {
     println!("Got to opcode {:?}", byte_arg);
 }
 
-fn i_eq_spr_digit_vx(byte_arg: Nybble) {
-    println!("Got to opcode {:?}", byte_arg);
+fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) {
+   match v_reg {
+        0x0 => *i_reg = SPR_ZERO_START,
+        0x1 => *i_reg = SPR_ONE_START,
+        0x2 => *i_reg = SPR_TWO_START,
+        0x3 => *i_reg = SPR_THREE_START,
+        0x4 => *i_reg = SPR_FOUR_START,
+        0x5 => *i_reg = SPR_FIVE_START,
+        0x6 => *i_reg = SPR_SIX_START,
+        0x7 => *i_reg = SPR_SEVEN_START,
+        0x8 => *i_reg = SPR_EIGHT_START,
+        0x9 => *i_reg = SPR_NINE_START,
+        0xa => *i_reg = SPR_A_START,
+        0xb => *i_reg = SPR_B_START,
+        0xc => *i_reg = SPR_C_START,
+        0xd => *i_reg = SPR_D_START,
+        0xe => *i_reg = SPR_E_START,
+        0xf => *i_reg = SPR_F_START,
+        _ => panic!("No such sprite exists for digit {:X}",v_reg),
+   }
 }
 
 fn store_dec_vx_in_i(ram: &mut Ram, i_reg: u16, v_reg: u8) {
@@ -578,6 +606,12 @@ fn read_i_in_vx_v0(byte_arg: Nybble, ram: &mut Ram, v_regs: &mut [u8; 16], i_reg
     }
 }
 
+// Note, this will panic if you attempt to pass in a value over 7, as it is "out of bounds" for
+// indexing a u8.
+
+fn get_bit(n: u8, b: u8) -> bool {
+    ((n >> (7 - b)) & 1 == 1)
+}
 
 #[test]
 fn test_fetch_opcode() {

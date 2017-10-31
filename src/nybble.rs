@@ -75,6 +75,13 @@ impl ThreeNybbles {
     pub fn x(&self) -> Nybble {
         Nybble::new([self.0[0]])
     }
+    pub fn y(&self) -> Nybble {
+        Nybble::new([self.0[1] >> 4])
+    }
+    pub fn byte_num(&self) -> u8 {
+        (self.0[1] & 0b00001111)
+    }
+
     pub fn get_byte(&self) -> u8 {
         self.0[1]
     }
