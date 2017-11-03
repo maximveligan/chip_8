@@ -484,7 +484,7 @@ fn execute(
         } 
         Opcode::ThreeArg(ThreeArg::JumpToCodeRout(arg)) => (), 
         Opcode::ThreeArg(ThreeArg::JumpToAddr(arg)) => regs.pc.0 = arg.to_addr(),
-        Opcode::ThreeArg(ThreeArg::CallSubAt(arg)) => stack.push(&mut regs.sp, &regs.pc), 
+        Opcode::ThreeArg(ThreeArg::CallSubAt(arg)) => {stack.push(&mut regs.sp, &regs.pc); regs.pc.0 = arg.to_addr();}, 
         Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
             skip_vx_eq_kk(regs.v_regs[arg.x().to_usize().expect("Check usize")], arg.get_byte(), &mut regs.pc)
         } 
