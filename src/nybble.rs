@@ -1,10 +1,12 @@
 use num::ToPrimitive;
 use std::fmt;
+
+#[derive(Debug, Clone, Copy)]
 pub struct Nybble([u8; 1]);
 
 impl Nybble {
     pub fn new(arg: [u8; 1]) -> Self {
-        if ((arg[0] & (0b11110000) != 0)) {
+        if arg[0] & (0b11110000) != 0 {
             panic!("Invalid nybble value: {:X}", arg[0]);
         } else {
             Nybble(arg)
@@ -15,12 +17,6 @@ impl Nybble {
 impl From<u16> for Nybble {
     fn from(op: u16) -> Nybble {
         Nybble::new([((op >> 8) & 0x0F) as u8])
-    }
-}
-
-impl fmt::Debug for Nybble {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0[0])
     }
 }
 
@@ -36,7 +32,7 @@ impl ToPrimitive for Nybble {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TwoNybbles([u8; 1]);
 
 impl TwoNybbles {
@@ -55,12 +51,12 @@ impl From<u16> for TwoNybbles {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ThreeNybbles([u8; 2]);
 
 impl ThreeNybbles {
     pub fn new(arg: [u8; 2]) -> Self {
-        if ((arg[0] & (0b11110000) != 0)) {
+        if arg[0] & (0b11110000) != 0 {
             panic!(
                 "Invalid nybble value: {:X}. Did your three arguments get parsed in correctly?",
                 arg[0]
@@ -70,7 +66,7 @@ impl ThreeNybbles {
         }
     }
     pub fn to_addr(&self) -> u16 {
-        ((((self.0[0] as u16) << 8) | (self.0[1]) as u16))
+        (((self.0[0] as u16) << 8) | (self.0[1]) as u16)
     }
     pub fn x(&self) -> Nybble {
         Nybble::new([self.0[0]])
@@ -89,6 +85,6 @@ impl ThreeNybbles {
 
 impl From<u16> for ThreeNybbles {
     fn from(op: u16) -> ThreeNybbles {
-        ThreeNybbles::new(([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8]))
+        ThreeNybbles::new([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8])
     }
 }
