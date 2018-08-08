@@ -296,6 +296,17 @@ impl Screen {
             0: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT],
         }
     }
+    fn draw_nybble(
+        &mut self,
+        x: u8,
+        y: u8,
+        ram_index: u16,
+        num_bytes: u8,
+        collision_flag: &mut u8,
+        ram: &Ram,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -307,6 +318,7 @@ impl Keyboard {
             0: [false; 0xF + 1],
         }
     }
+    fn update(&mut self) {}
 }
 
 fn main() {
@@ -314,29 +326,49 @@ fn main() {
     let mut regs: Registers = Registers::new();
     let mut stack: Stack = Stack::new();
     let mut screen: Screen = Screen::new();
-    let keyboard: Keyboard = Keyboard::new();
+    let mut keyboard: Keyboard = Keyboard::new();
+    let mut draw_flag: bool = false;
+    load_rom("/home/grodion/dev/chip_8/pong.ch8", &mut ram);
+    regs.pc.0 = 0x200;
     loop {
         match decode_op(fetch_opcode(&regs.pc, &ram)) {
-            Ok(op) => execute(
+            Ok(op) => match execute(
                 op,
                 &mut ram,
                 &mut regs,
                 &mut stack,
                 &mut screen,
                 &keyboard,
-            ),
-            Err(inv_op) => panic!("{:?}", inv_op),
+                &mut draw_flag,
+            ) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("Found an error during execution: {:?}", err);
+                    break;
+                }
+            },
+            Err(inv_op) => {
+                println!("Found an error during decoding: {:?}", inv_op);
+                break;
+            }
         };
+        if draw_flag {
+            draw_pixel_buffer(&screen);
+            draw_flag = false;
+        }
+        keyboard.update();
         regs.pc.update();
     }
 }
+
+fn draw_pixel_buffer(screen: &Screen) {}
 
 fn load_rom(file: &str, ram: &mut Ram) {
     let mut rom = File::open(file).expect("Rom not found");
     let mut raw_bytes = Vec::new();
     rom.read_to_end(&mut raw_bytes)
         .expect("Something went wrong while reading the rom");
-    &ram.0[0x200..0xFFF].copy_from_slice(&raw_bytes);
+    &ram.0[0x200..0x200 + raw_bytes.len()].copy_from_slice(&raw_bytes);
 }
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
@@ -465,12 +497,15 @@ fn execute(
     stack: &mut Stack,
     screen: &mut Screen,
     keyboard: &Keyboard,
+    draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
     match opcode {
         Opcode::NoArg(NoArg::ClearScreen) => {
-            Ok(screen.0.iter_mut().for_each(|inner_array| {
+            screen.0.iter_mut().for_each(|inner_array| {
                 inner_array.iter_mut().for_each(|pixel| *pixel = false)
-            }))
+            });
+            *draw_flag = true;
+            Ok(())
         }
         Opcode::NoArg(NoArg::ReturnSubrt) => match stack.pop(&mut regs.sp) {
             Ok(pc) => Ok(regs.pc = pc),
@@ -678,22 +713,20 @@ fn execute(
             Ok(regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 res as u8)
         }
-        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => {
-            match draw_vx_vy_nybble(
-                arg.get_byte(),
+        Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match screen
+            .draw_nybble(
                 regs.v_regs[arg.x().to_usize().expect("Check usize")],
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
                 regs.i_reg,
+                arg.get_byte(),
                 &mut regs.v_regs[FLAG_REG],
                 ram,
-                screen,
             ) {
-                Ok(_) => Ok(()),
-                Err(err) => Err(InvalidOpcode::OutOfScreenBounds(
-                    err, opcode, regs.pc, *ram, *screen,
-                )),
-            }
-        }
+            Ok(_) => {*draw_flag = true; Ok(())},
+            Err(err) => Err(InvalidOpcode::OutOfScreenBounds(
+                err, opcode, regs.pc, *ram, *screen,
+            )),
+        },
     }
 }
 
@@ -726,18 +759,6 @@ fn skip_vx_neq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter) {
     }
 }
 
-fn draw_vx_vy_nybble(
-    byte_num: u8,
-    v_x: u8,
-    v_y: u8,
-    i_reg: u16,
-    flag: &mut u8,
-    ram: &mut Ram,
-    screen: &mut Screen,
-) -> Result<(), String> {
-    Ok(())
-}
-
 fn skip_if_vx(byte_arg: Nybble, keyboard: &Keyboard, pc: &mut ProgramCounter) {
     if keyboard.0[byte_arg.to_usize().expect("Check usize")] {
         pc.update();
@@ -755,7 +776,7 @@ fn skip_if_not_vx(
 }
 
 fn load_key_vx(byte_arg: Nybble) {
-    println!("Got to opcode {:?}", byte_arg);
+    unimplemented!("Got to opcode {:?}", byte_arg);
 }
 
 fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) -> Result<(), String> {
@@ -811,8 +832,11 @@ fn store_v0_vx_in_ram(
 // Note, this will panic if you attempt to pass in a value over 7, as it is
 // "out of bounds" for indexing a u8.
 
-fn get_bit(n: u8, b: u8) -> bool {
-    ((n >> (7 - b)) & 1 == 1)
+fn get_bit(n: u8, b: u8) -> Result<bool, String> {
+    if n > 7 {
+        return Err(format!("Attempted to pass in a val greater than 7 {}", n))
+    }
+    Ok(((n >> (7 - b)) & 1 == 1))
 }
 
 #[test]
