@@ -156,9 +156,6 @@ enum InvalidOpcode {
     UndefBehavior(String, Opcode, ProgramCounter, Ram),
 }
 
-#[derive(Debug)]
-struct Argument(u16);
-
 #[derive(Debug, Clone, Copy)]
 struct Registers {
     pc: ProgramCounter,
@@ -233,6 +230,14 @@ impl Ram {
         }
         byte_vec
     }
+
+    fn load_rom(&mut self, file: &str) {
+        let mut rom = File::open(file).expect("Rom not found");
+        let mut raw_bytes = Vec::new();
+        rom.read_to_end(&mut raw_bytes)
+            .expect("Something went wrong while reading the rom");
+        self.0[0x200..0x200 + raw_bytes.len()].copy_from_slice(&raw_bytes);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -241,6 +246,12 @@ struct ProgramCounter(u16);
 impl ProgramCounter {
     fn update(&mut self) {
         self.0 += 2;
+    }
+    fn set_addr(&mut self, addr: u16) {
+        self.0 = addr;
+    }
+    fn get_addr(&self) -> u16 {
+        self.0
     }
 }
 
@@ -256,7 +267,7 @@ impl Stack {
             return Err("Stack overflow".to_string());
         }
         *sp = *sp + 1;
-        self.0[*sp as usize] = pc.0;
+        self.0[*sp as usize] = pc.get_addr();
         Ok(())
     }
 
@@ -328,8 +339,9 @@ fn main() {
     let mut screen: Screen = Screen::new();
     let mut keyboard: Keyboard = Keyboard::new();
     let mut draw_flag: bool = false;
-    load_rom("/home/grodion/dev/chip_8/pong.ch8", &mut ram);
-    regs.pc.0 = 0x200;
+    ram.load_rom("/home/grodion/dev/chip_8/pong.ch8");
+    ram.load_digit_data();
+    regs.pc.set_addr(0x200);
     loop {
         match decode_op(fetch_opcode(&regs.pc, &ram)) {
             Ok(op) => match execute(
@@ -363,17 +375,9 @@ fn main() {
 
 fn draw_pixel_buffer(screen: &Screen) {}
 
-fn load_rom(file: &str, ram: &mut Ram) {
-    let mut rom = File::open(file).expect("Rom not found");
-    let mut raw_bytes = Vec::new();
-    rom.read_to_end(&mut raw_bytes)
-        .expect("Something went wrong while reading the rom");
-    &ram.0[0x200..0x200 + raw_bytes.len()].copy_from_slice(&raw_bytes);
-}
-
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
-    let l_byte: u8 = ram.0[pc.0 as usize];
-    let r_byte: u8 = ram.0[(pc.0 + 1) as usize];
+    let l_byte: u8 = ram.0[pc.get_addr() as usize];
+    let r_byte: u8 = ram.0[(pc.get_addr() + 1) as usize];
     ((l_byte as u16) << 8) | (r_byte as u16)
 }
 
@@ -637,12 +641,12 @@ fn execute(
                     *ram,
                 ));
             }
-            regs.pc.0 = arg.to_addr();
+            regs.pc.set_addr(arg.to_addr());
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::CallSubAt(arg)) => {
             match stack.push(&mut regs.sp, &regs.pc) {
-                Ok(_) => Ok(regs.pc.0 = arg.to_addr()),
+                Ok(_) => Ok(regs.pc.set_addr(arg.to_addr())),
                 Err(err) => Err(InvalidOpcode::StackOverflow(
                     err, *stack, opcode, regs.pc, *ram,
                 )),
@@ -698,7 +702,7 @@ fn execute(
                     *ram,
                 ));
             }
-            Ok(regs.pc.0 = sum as u16)
+            Ok(regs.pc.set_addr(sum as u16))
         }
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
             let res = arg.get_byte() as usize & rand::random::<u8>() as usize;
@@ -843,7 +847,7 @@ fn get_bit(n: u8, b: u8) -> Result<bool, String> {
 fn test_fetch_opcode() {
     let mut ram: Ram = Ram::new();
     let mut regs: Registers = Registers::new();
-    regs.pc.0 = 0;
+    regs.pc.set_addr(0);
     ram.0[0] = 0xFF;
     ram.0[1] = 0xA2;
     assert_eq!(fetch_opcode(&regs.pc, &ram), 0xFFA2);
@@ -888,7 +892,7 @@ fn test_decode_op() {
     loop {
         decode_op(fetch_opcode(&regs.pc, &ram))?;
         regs.pc.update();
-        if (regs.pc.0 == (chip8_addr + (amount_of_ops * 2))) {
+        if (regs.pc.get_addr() == (chip8_addr + (amount_of_ops * 2))) {
             break;
         }
     }
