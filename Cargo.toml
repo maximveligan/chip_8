@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["Maxim <maximveligan@gmail.com>"]
 
 [dependencies]
-rand = "0.3"
+rand = "0.4"
 num = "0.1.40"
-bit-vec = "0.4.4"
+piston_window = "0.70.0"

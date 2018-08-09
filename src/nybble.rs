@@ -74,7 +74,7 @@ impl ThreeNybbles {
     pub fn y(&self) -> Nybble {
         Nybble::new([self.0[1] >> 4])
     }
-    pub fn byte_num(&self) -> u8 {
+    pub fn last_nybble(&self) -> u8 {
         (self.0[1] & 0b00001111)
     }
 

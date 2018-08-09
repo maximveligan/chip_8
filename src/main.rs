@@ -1,6 +1,9 @@
 extern crate num;
 extern crate rand;
+extern crate piston_window;
 use num::ToPrimitive;
+use piston_window::WindowSettings;
+use piston_window::PistonWindow;
 use std::fmt;
 use nybble::Nybble;
 use nybble::ThreeNybbles;
@@ -201,22 +204,22 @@ impl Ram {
         Ram { 0: [0; 0xFFF] }
     }
     fn load_digit_data(&mut self) {
-        self.0[0000..0004].copy_from_slice(&SPR_ZERO);
-        self.0[0005..0009].copy_from_slice(&SPR_ONE);
-        self.0[0010..0014].copy_from_slice(&SPR_TWO);
-        self.0[0015..0019].copy_from_slice(&SPR_THREE);
-        self.0[0020..0024].copy_from_slice(&SPR_FOUR);
-        self.0[0025..0029].copy_from_slice(&SPR_FIVE);
-        self.0[0030..0034].copy_from_slice(&SPR_SIX);
-        self.0[0035..0039].copy_from_slice(&SPR_SEVEN);
-        self.0[0040..0044].copy_from_slice(&SPR_EIGHT);
-        self.0[0045..0049].copy_from_slice(&SPR_NINE);
-        self.0[0050..0054].copy_from_slice(&SPR_A);
-        self.0[0055..0059].copy_from_slice(&SPR_B);
-        self.0[0060..0064].copy_from_slice(&SPR_C);
-        self.0[0065..0069].copy_from_slice(&SPR_D);
-        self.0[0070..0074].copy_from_slice(&SPR_E);
-        self.0[0075..0079].copy_from_slice(&SPR_F);
+        self.0[0000..0005].copy_from_slice(&SPR_ZERO);
+        self.0[0005..0010].copy_from_slice(&SPR_ONE);
+        self.0[0010..0015].copy_from_slice(&SPR_TWO);
+        self.0[0015..0020].copy_from_slice(&SPR_THREE);
+        self.0[0020..0025].copy_from_slice(&SPR_FOUR);
+        self.0[0025..0030].copy_from_slice(&SPR_FIVE);
+        self.0[0030..0035].copy_from_slice(&SPR_SIX);
+        self.0[0035..0040].copy_from_slice(&SPR_SEVEN);
+        self.0[0040..0045].copy_from_slice(&SPR_EIGHT);
+        self.0[0045..0050].copy_from_slice(&SPR_NINE);
+        self.0[0050..0055].copy_from_slice(&SPR_A);
+        self.0[0055..0060].copy_from_slice(&SPR_B);
+        self.0[0060..0065].copy_from_slice(&SPR_C);
+        self.0[0065..0070].copy_from_slice(&SPR_D);
+        self.0[0070..0075].copy_from_slice(&SPR_E);
+        self.0[0075..0080].copy_from_slice(&SPR_F);
     }
 
     //  This might be wrong, double check the logic
@@ -312,10 +315,42 @@ impl Screen {
         x: u8,
         y: u8,
         ram_index: u16,
-        num_bytes: u8,
+        num_bytes: Nybble,
         collision_flag: &mut u8,
         ram: &Ram,
     ) -> Result<(), String> {
+        if x > (SCREEN_WIDTH as u8) || y > (SCREEN_HEIGHT as u8) {
+            return Err(format!("Out of screen bounds: {0}, {1}", x, y));
+        }
+        let sprite = ram.retrieve_bytes(ram_index, num_bytes);
+        for byte_num in 0..sprite.len() {
+            for bit in 0..8 {
+                let pixel_val = get_bit(sprite[byte_num], bit)
+                    .expect("Iterator went over 8");
+                let mut x_cord;
+                let mut y_cord;
+                if y as usize + byte_num >= SCREEN_HEIGHT {
+                    y_cord =
+                        Some((y as usize + byte_num) % (SCREEN_HEIGHT - 1));
+                } else {
+                    y_cord = Some(y as usize + byte_num);
+                }
+                if (x + bit) as usize >= SCREEN_WIDTH {
+                    x_cord = Some((x + bit) as usize % (SCREEN_WIDTH - 1));
+                } else {
+                    x_cord = Some((x + bit) as usize);
+                }
+                *collision_flag =
+                    ((self.0[y_cord.expect("Should've gotten an x value")]
+                        [x_cord.expect("Should've gotten a y value")]
+                        ^ pixel_val)
+                        || (*collision_flag == 1)) as u8;
+
+                self.0[y_cord.expect("Should've gotten an x value")]
+                    [x_cord.expect("Should've gotten a y value")] = pixel_val
+            }
+        }
+
         Ok(())
     }
 }
@@ -342,6 +377,14 @@ fn main() {
     ram.load_rom("/home/grodion/dev/chip_8/pong.ch8");
     ram.load_digit_data();
     regs.pc.set_addr(0x200);
+
+    let mut window: PistonWindow = WindowSettings::new(
+        "Rust-8 Emulator",
+        [SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32])
+        .exit_on_esc(true)
+        .build()
+        .unwrap();
+
     loop {
         match decode_op(fetch_opcode(&regs.pc, &ram)) {
             Ok(op) => match execute(
@@ -512,8 +555,10 @@ fn execute(
             Ok(())
         }
         Opcode::NoArg(NoArg::ReturnSubrt) => match stack.pop(&mut regs.sp) {
-            Ok(pc) => Ok(regs.pc = pc),
-
+            Ok(pc) => {
+                regs.pc = pc;
+                Ok(())
+            }
             Err(err) => Err(InvalidOpcode::StackUnderflow(
                 err,
                 stack.clone(),
@@ -524,23 +569,34 @@ fn execute(
         },
 
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
-            Ok(skip_if_vx(arg, keyboard, &mut regs.pc))
+            skip_if_vx(arg, keyboard, &mut regs.pc);
+            Ok(())
         }
         Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
-            Ok(skip_if_not_vx(arg, keyboard, &mut regs.pc))
+            skip_if_not_vx(arg, keyboard, &mut regs.pc);
+            Ok(())
         }
         Opcode::OneArg(OneArg::SetVxDT(arg)) => {
-            Ok(regs.v_regs[arg.to_usize().expect("Check usize")] = regs.delay)
+            regs.v_regs[arg.to_usize().expect("Check usize")] = regs.delay;
+            Ok(())
         }
-        Opcode::OneArg(OneArg::WaitForKey(arg)) => Ok(load_key_vx(arg)),
+        Opcode::OneArg(OneArg::WaitForKey(arg)) => {
+            load_key_vx(arg);
+            Ok(())
+        }
         Opcode::OneArg(OneArg::SetDT(arg)) => {
-            Ok(regs.delay = regs.v_regs[arg.to_usize().expect("Check usize")])
+            regs.delay = regs.v_regs[arg.to_usize().expect("Check usize")];
+            Ok(())
         }
         Opcode::OneArg(OneArg::SetST(arg)) => {
-            Ok(regs.sound = regs.v_regs[arg.to_usize().expect("Check usize")])
+            regs.sound = regs.v_regs[arg.to_usize().expect("Check usize")];
+            Ok(())
         }
-        Opcode::OneArg(OneArg::SetI(arg)) => Ok(regs.i_reg +=
-            (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16),
+        Opcode::OneArg(OneArg::SetI(arg)) => {
+            regs.i_reg +=
+                (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16;
+            Ok(())
+        }
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => match i_eq_spr_digit_vx(
             regs.v_regs[arg.to_usize().expect("Check usize")],
             &mut regs.i_reg,
@@ -550,37 +606,50 @@ fn execute(
                 err, opcode, regs.pc, *ram,
             )),
         },
-        Opcode::OneArg(OneArg::StoreDecVx(arg)) => Ok(store_dec_vx_in_i(
-            ram,
-            regs.i_reg,
-            regs.v_regs[arg.to_usize().expect("Check usize")],
-        )),
-        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
-            Ok(store_v0_vx_in_ram(arg, ram, &mut regs.v_regs, &regs.i_reg))
+        Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
+            store_dec_vx_in_i(
+                ram,
+                regs.i_reg,
+                regs.v_regs[arg.to_usize().expect("Check usize")],
+            );
+            Ok(())
         }
-        Opcode::OneArg(OneArg::ReadV0Vx(arg)) => Ok(read_from_ram_in_v0_vx(
-            arg,
-            ram,
-            &mut regs.v_regs,
-            &regs.i_reg,
-        )),
-        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => Ok(skip_vx_eq_vy(
-            regs.v_regs[arg.x().to_usize().expect("Check usize")],
-            regs.v_regs[arg.y().to_usize().expect("Check usize")],
-            &mut regs.pc,
-        )),
-        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => Ok(regs.v_regs
-            [arg.x().to_usize().expect("Check usize")] =
-            regs.v_regs[arg.y().to_usize().expect("Check usize")]),
-        Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => Ok(regs.v_regs
-            [arg.x().to_usize().expect("Check usize")] |=
-            regs.v_regs[arg.y().to_usize().expect("Check usize")]),
-        Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => Ok(regs.v_regs
-            [arg.x().to_usize().expect("Check usize")] &=
-            regs.v_regs[arg.y().to_usize().expect("Check usize")]),
-        Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => Ok(regs.v_regs
-            [arg.x().to_usize().expect("Check usize")] ^=
-            regs.v_regs[arg.y().to_usize().expect("Check usize")]),
+        Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
+            store_v0_vx_in_ram(arg, ram, &mut regs.v_regs, &regs.i_reg);
+            Ok(())
+        }
+        Opcode::OneArg(OneArg::ReadV0Vx(arg)) => {
+            read_from_ram_in_v0_vx(arg, ram, &mut regs.v_regs, &regs.i_reg);
+            Ok(())
+        }
+        Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => {
+            skip_vx_eq_vy(
+                regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                &mut regs.pc,
+            );
+            Ok(())
+        }
+        Opcode::TwoArg(TwoArg::VxEqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            Ok(())
+        }
+        Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] |=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            Ok(())
+        }
+        Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] &=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            Ok(())
+        }
+        Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] ^=
+                regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            Ok(())
+        }
         Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
             let (x, flag) = regs.v_regs
                 [arg.x().to_usize().expect("Check usize")]
@@ -605,7 +674,8 @@ fn execute(
             regs.v_regs[FLAG_REG] = (0b00000001
                 & regs.v_regs[arg.x().to_usize().expect("Check usize")]
                 == 0b00000001) as u8;
-            regs.v_regs[arg.x().to_usize().expect("Check usize")] >> 1;
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                regs.v_regs[arg.x().to_usize().expect("Check usize")] >> 1;
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
@@ -622,15 +692,19 @@ fn execute(
             regs.v_regs[FLAG_REG] = (0b1000000
                 & regs.v_regs[arg.x().to_usize().expect("Check usize")]
                 == 0b10000000) as u8;
-            regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
             Ok(())
         }
-        Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => Ok(skip_vx_neq_vy(
-            regs.v_regs[arg.x().to_usize().expect("Check usize")],
-            regs.v_regs[arg.y().to_usize().expect("Check usize")],
-            &mut regs.pc,
-        )),
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(arg)) => Ok(()),
+        Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
+            skip_vx_neq_vy(
+                regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                &mut regs.pc,
+            );
+            Ok(())
+        }
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(_)) => Ok(()),
         Opcode::ThreeArg(ThreeArg::JumpToAddr(arg)) => {
             let addr = arg.to_addr();
             if addr % 2 != 0 {
@@ -646,25 +720,37 @@ fn execute(
         }
         Opcode::ThreeArg(ThreeArg::CallSubAt(arg)) => {
             match stack.push(&mut regs.sp, &regs.pc) {
-                Ok(_) => Ok(regs.pc.set_addr(arg.to_addr())),
+                Ok(_) => {
+                    regs.pc.set_addr(arg.to_addr());
+                    Ok(())
+                }
                 Err(err) => Err(InvalidOpcode::StackOverflow(
                     err, *stack, opcode, regs.pc, *ram,
                 )),
             }
         }
-        Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => Ok(skip_vx_eq_kk(
-            regs.v_regs[arg.x().to_usize().expect("Check usize")],
-            arg.get_byte(),
-            &mut regs.pc,
-        )),
-        Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => Ok(skip_vx_neq_kk(
-            regs.v_regs[arg.x().to_usize().expect("Check usize")],
-            arg.get_byte(),
-            &mut regs.pc,
-        )),
-        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => Ok(regs.v_regs
-            [arg.x().to_usize().expect("Check usize") as usize] =
-            arg.get_byte()),
+        Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
+            skip_vx_eq_kk(
+                regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                arg.get_byte(),
+                &mut regs.pc,
+            );
+            Ok(())
+        }
+        Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => {
+            skip_vx_neq_kk(
+                regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                arg.get_byte(),
+                &mut regs.pc,
+            );
+            Ok(())
+        }
+
+        Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
+            regs.v_regs[arg.x().to_usize().expect("Check usize") as usize] =
+                arg.get_byte();
+            Ok(())
+        }
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
             let sum: usize = arg.get_byte() as usize
                 + regs.v_regs[arg.x().to_usize().expect("Check usize")]
@@ -677,12 +763,14 @@ fn execute(
                     *ram,
                 ));
             } else {
-                Ok(regs.v_regs[arg.x().to_usize().expect("Check usize")] =
-                    sum as u8)
+                regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                    sum as u8;
+                Ok(())
             }
         }
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => {
-            Ok(regs.i_reg = arg.to_addr())
+            regs.i_reg = arg.to_addr();
+            Ok(())
         }
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
             let sum = (regs.v_regs[0] as usize) + arg.to_addr() as usize;
@@ -702,7 +790,8 @@ fn execute(
                     *ram,
                 ));
             }
-            Ok(regs.pc.set_addr(sum as u16))
+            regs.pc.set_addr(sum as u16);
+            Ok(())
         }
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
             let res = arg.get_byte() as usize & rand::random::<u8>() as usize;
@@ -714,19 +803,22 @@ fn execute(
                     *ram,
                 ));
             }
-            Ok(regs.v_regs[arg.x().to_usize().expect("Check usize")] =
-                res as u8)
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] = res as u8;
+            Ok(())
         }
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match screen
             .draw_nybble(
                 regs.v_regs[arg.x().to_usize().expect("Check usize")],
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
                 regs.i_reg,
-                arg.get_byte(),
+                Nybble::new([arg.last_nybble()]),
                 &mut regs.v_regs[FLAG_REG],
                 ram,
             ) {
-            Ok(_) => {*draw_flag = true; Ok(())},
+            Ok(_) => {
+                *draw_flag = true;
+                Ok(())
+            }
             Err(err) => Err(InvalidOpcode::OutOfScreenBounds(
                 err, opcode, regs.pc, *ram, *screen,
             )),
@@ -737,7 +829,7 @@ fn execute(
 //  Possible optimization of next three, abstract into higher order function
 
 fn skip_vx_eq_kk(v_x: u8, byte: u8, pc: &mut ProgramCounter) {
-    if (v_x == byte) {
+    if v_x == byte {
         pc.update();
     }
 }
@@ -838,9 +930,9 @@ fn store_v0_vx_in_ram(
 
 fn get_bit(n: u8, b: u8) -> Result<bool, String> {
     if n > 7 {
-        return Err(format!("Attempted to pass in a val greater than 7 {}", n))
+        return Err(format!("Attempted to pass in a val greater than 7 {}", n));
     }
-    Ok(((n >> (7 - b)) & 1 == 1))
+    Ok((n >> (7 - b)) & 1 == 1)
 }
 
 #[test]
