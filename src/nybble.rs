@@ -30,6 +30,9 @@ impl ToPrimitive for Nybble {
     fn to_usize(&self) -> Option<usize> {
         Some(self.0[0] as usize)
     }
+    fn to_u8(&self) -> Option<u8> {
+        Some(self.0[0] as u8)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

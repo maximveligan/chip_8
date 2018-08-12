@@ -4,6 +4,9 @@ extern crate piston_window;
 use num::ToPrimitive;
 use piston_window::WindowSettings;
 use piston_window::PistonWindow;
+use piston_window::RenderEvent;
+use piston_window::PressEvent;
+use piston_window::*;
 use std::fmt;
 use nybble::Nybble;
 use nybble::ThreeNybbles;
@@ -13,6 +16,7 @@ use std::io::prelude::*;
 
 mod nybble;
 
+const CLOCK_SPEED: f64 = 1.0;
 const SPR_ZERO_START: u16 = 0000;
 const SPR_ONE_START: u16 = 0005;
 const SPR_TWO_START: u16 = 0010;
@@ -28,7 +32,7 @@ const SPR_B_START: u16 = 0055;
 const SPR_C_START: u16 = 0060;
 const SPR_D_START: u16 = 0065;
 const SPR_E_START: u16 = 0070;
-const SPR_F_START: u16 = 0075;
+const SPR_F_START: u16 = 1075;
 
 const SPR_ZERO: [u8; 5] = [0xF0, 0x90, 0x90, 0x90, 0xF0];
 const SPR_ONE: [u8; 5] = [0x20, 0x60, 0x20, 0x20, 0x70];
@@ -266,11 +270,11 @@ impl Stack {
         Stack { 0: [0; 16] }
     }
     fn push(&mut self, sp: &mut u8, pc: &ProgramCounter) -> Result<(), String> {
-        if *sp >= 15 {
+        if *sp > 15 {
             return Err("Stack overflow".to_string());
         }
-        *sp = *sp + 1;
         self.0[*sp as usize] = pc.get_addr();
+        *sp = *sp + 1;
         Ok(())
     }
 
@@ -356,17 +360,61 @@ impl Screen {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Keyboard([bool; 0xF + 1]);
+struct Keyboard {
+    key_buffer: [bool; 0xF + 1],
+    wait_press: Option<u8>,
+}
 
 impl Keyboard {
     fn new() -> Keyboard {
         Keyboard {
-            0: [false; 0xF + 1],
+            key_buffer: [false; 0xF + 1],
+            wait_press: None,
         }
     }
-    fn update(&mut self) {}
+
+    fn press_key(&mut self, key: Key, vreg: &mut [u8; 16]) {
+        if let Some(key) = key_to_usize(key) {
+            self.key_buffer[key] = true; 
+        }
+        if self.wait_press != None {
+            match key_to_usize(key) {
+                Some(key) => {vreg[self.wait_press.unwrap() as usize] = key as u8}
+                None => (),
+            }
+            self.wait_press = None;
+        }
+    }
+
+    fn release_key(&mut self, key: Key) {
+        if let Some(key) = key_to_usize(key) {
+            self.key_buffer[key] = false; 
+        }
+    }
 }
 
+fn key_to_usize(key: Key) -> Option<usize> {
+    match key {
+        Key::D1 => Some(1),
+        Key::D2 => Some(2),
+        Key::D3 => Some(3),
+        Key::D4 => Some(0xc),
+        Key::Q => Some(4),
+        Key::W => Some(5),
+        Key::E => Some(6),
+        Key::R => Some(0xd),
+        Key::A => Some(7),
+        Key::S => Some(8),
+        Key::D => Some(9),
+        Key::F => Some(0xE),
+        Key::Z => Some(0xA),
+        Key::X => Some(0),
+        Key::C => Some(0xB),
+        Key::V => Some(0xF),
+        _ => None,
+    }
+}
+    
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut regs: Registers = Registers::new();
@@ -384,39 +432,74 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap();
+    window.set_ups(60);
 
-    loop {
-        match decode_op(fetch_opcode(&regs.pc, &ram)) {
-            Ok(op) => match execute(
-                op,
-                &mut ram,
-                &mut regs,
-                &mut stack,
-                &mut screen,
-                &keyboard,
-                &mut draw_flag,
-            ) {
-                Ok(_) => (),
-                Err(err) => {
-                    println!("Found an error during execution: {:?}", err);
-                    break;
-                }
-            },
-            Err(inv_op) => {
-                println!("Found an error during decoding: {:?}", inv_op);
-                break;
+    while let Some(e) = window.next() {
+        if let Some(_) = e.render_args() {
+            if draw_flag {
+                println!("{:?}", &screen);
+                draw_pixel_buffer(&screen);
+                draw_flag = false;
             }
-        };
-        if draw_flag {
-            draw_pixel_buffer(&screen);
-            draw_flag = false;
         }
-        keyboard.update();
-        regs.pc.update();
+
+        if let Some(up_args) = e.update_args() {
+            if keyboard.wait_press == None {
+                if regs.delay != 0 {
+                    regs.delay -= 1;
+                }
+                let mut num_inst = (up_args.dt * CLOCK_SPEED).round() as usize;
+                if num_inst == 0 {
+                    num_inst = 1;
+                }
+                for _ in 0..num_inst {
+                    if keyboard.wait_press == None {
+                        match decode_op(fetch_opcode(&regs.pc, &ram)) {
+                            Ok(op) => match execute(
+                                op,
+                                &mut ram,
+                                &mut regs,
+                                &mut stack,
+                                &mut screen,
+                                &mut keyboard,
+                                &mut draw_flag,
+                            ) {
+                                Ok(_) => (),
+                                Err(err) => {
+                                    println!("Found an error during execution: {:?}", err);
+                                    return
+                                }
+                            },
+                            Err(inv_op) => {
+                                println!("Found an error during decoding: {:?}", inv_op);
+                                return
+                            }
+                        };
+                        regs.pc.update();
+                    }
+                }
+            }
+        }
+
+        if let Some(k) = e.press_args() {
+            match k {
+                Button::Keyboard(input) => keyboard.press_key(input, &mut regs.v_regs),
+                _ => (),
+            }
+        }
+
+        if let Some(k) = e.release_args() {
+            match k {
+                Button::Keyboard(input) => keyboard.release_key(input),
+                _ => (),
+            }
+        }
     }
 }
 
-fn draw_pixel_buffer(screen: &Screen) {}
+fn draw_pixel_buffer(screen: &Screen) {
+
+}
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     let l_byte: u8 = ram.0[pc.get_addr() as usize];
@@ -543,7 +626,7 @@ fn execute(
     regs: &mut Registers,
     stack: &mut Stack,
     screen: &mut Screen,
-    keyboard: &Keyboard,
+    keyboard: &mut Keyboard,
     draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
     match opcode {
@@ -581,7 +664,7 @@ fn execute(
             Ok(())
         }
         Opcode::OneArg(OneArg::WaitForKey(arg)) => {
-            load_key_vx(arg);
+            keyboard.wait_press = Some(arg.to_u8().expect("Check u8"));
             Ok(())
         }
         Opcode::OneArg(OneArg::SetDT(arg)) => {
@@ -856,7 +939,7 @@ fn skip_vx_neq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter) {
 }
 
 fn skip_if_vx(byte_arg: Nybble, keyboard: &Keyboard, pc: &mut ProgramCounter) {
-    if keyboard.0[byte_arg.to_usize().expect("Check usize")] {
+    if keyboard.key_buffer[byte_arg.to_usize().expect("Check usize")] {
         pc.update();
     }
 }
@@ -866,13 +949,9 @@ fn skip_if_not_vx(
     keyboard: &Keyboard,
     pc: &mut ProgramCounter,
 ) {
-    if !keyboard.0[byte_arg.to_usize().expect("Check usize")] {
+    if !keyboard.key_buffer[byte_arg.to_usize().expect("Check usize")] {
         pc.update();
     }
-}
-
-fn load_key_vx(byte_arg: Nybble) {
-    unimplemented!("Got to opcode {:?}", byte_arg);
 }
 
 fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) -> Result<(), String> {
