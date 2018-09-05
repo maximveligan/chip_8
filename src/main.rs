@@ -124,12 +124,10 @@ impl Ram {
         self.0[0075..0080].copy_from_slice(&SPR_F);
     }
 
-    //  This might be wrong, double check the logic
-
     fn retrieve_bytes(self, index: u16, amount: Nybble) -> Vec<u8> {
         let mut byte_vec = Vec::new();
-//        println!("{:?}", byte);
-        for i in index as usize..(index as usize + amount.to_usize().expect("Check usize"))
+        for i in index as usize
+            ..(index as usize + amount.to_usize().expect("Check usize"))
         {
             byte_vec.push(self.0[i]);
         }
@@ -232,8 +230,10 @@ impl Screen {
                     .expect("Iterator went over 8");
                 let y_cord = Some((y as usize + byte_num) % (SCREEN_HEIGHT));
                 let x_cord = Some((x + bit) as usize % (SCREEN_WIDTH));
-                *collision_flag |= (pixel_val & self.0[y_cord.expect("Should've gotten an x value")]
-                        [x_cord.expect("Should've gotten a y value")]) as u8;
+                *collision_flag |= (pixel_val
+                    & self.0[y_cord.expect("Should've gotten an x value")]
+                        [x_cord.expect("Should've gotten a y value")])
+                    as u8;
 
                 self.0[y_cord.expect("Should've gotten an x value")]
                     [x_cord.expect("Should've gotten a y value")] ^= pixel_val
@@ -341,7 +341,10 @@ fn main() {
                 &mut draw_flag,
             ) {
                 Ok(_) => (),
-                Err(err) => {println!("{:?}", err); return ();}
+                Err(err) => {
+                    println!("{:?}", err);
+                    return ();
+                }
             }
         }
 
@@ -381,15 +384,15 @@ fn emulate_cycles(
         for _ in 0..num_inst {
             if keyboard.wait_press == None {
                 let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram))?;
-                match execute(op, ram, regs, stack, screen, keyboard, draw_flag) {
+                match execute(op, ram, regs, stack, screen, keyboard, draw_flag)
+                {
                     Ok(_) => (),
                     Err(err) => return Err(err),
                 };
             }
         }
         Ok(())
-    }
-    else {
+    } else {
         Ok(())
     }
 }
@@ -427,10 +430,7 @@ fn execute(
                 regs.pc.update();
                 Ok(())
             }
-            Err(err) => Err(InvalidOpcode::StackUnderflow(
-                err,
-                opcode,
-            )),
+            Err(err) => Err(InvalidOpcode::StackUnderflow(err, opcode)),
         },
 
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
@@ -473,10 +473,11 @@ fn execute(
             regs.v_regs[arg.to_usize().expect("Check usize")],
             &mut regs.i_reg,
         ) {
-            Ok(_) => {regs.pc.update(); Ok(())},
-            Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(
-                err, opcode,
-            )),
+            Ok(_) => {
+                regs.pc.update();
+                Ok(())
+            }
+            Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(err, opcode)),
         },
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
             store_dec_vx_in_i(
@@ -590,7 +591,10 @@ fn execute(
             regs.pc.update();
             Ok(())
         }
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(_)) => {regs.pc.update(); Ok(())}
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(_)) => {
+            regs.pc.update();
+            Ok(())
+        }
         Opcode::ThreeArg(ThreeArg::JumpToAddr(arg)) => {
             regs.pc.set_addr(arg.to_addr());
             Ok(())
@@ -601,9 +605,7 @@ fn execute(
                     regs.pc.set_addr(arg.to_addr());
                     Ok(())
                 }
-                Err(err) => Err(InvalidOpcode::StackOverflow(
-                    err, opcode,
-                )),
+                Err(err) => Err(InvalidOpcode::StackOverflow(err, opcode)),
             }
         }
         Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
@@ -632,7 +634,10 @@ fn execute(
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check usize")] = regs.v_regs[arg.x().to_usize().expect("Check usize")].overflowing_add(arg.get_byte()).0;
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] = regs.v_regs
+                [arg.x().to_usize().expect("Check usize")]
+                .overflowing_add(arg.get_byte())
+                .0;
             regs.pc.update();
             Ok(())
         }
@@ -678,9 +683,7 @@ fn execute(
                 regs.pc.update();
                 Ok(())
             }
-            Err(err) => Err(InvalidOpcode::OutOfScreenBounds(
-                err, opcode,
-            )),
+            Err(err) => Err(InvalidOpcode::OutOfScreenBounds(err, opcode)),
         },
     }
 }
