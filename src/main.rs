@@ -9,14 +9,19 @@ use piston_window::PressEvent;
 use piston_window::*;
 use std::fmt;
 use nybble::Nybble;
-use nybble::ThreeNybbles;
-use nybble::TwoNybbles;
+use opcode::Opcode;
+use opcode::InvalidOpcode;
+use opcode::NoArg;
+use opcode::OneArg;
+use opcode::TwoArg;
+use opcode::ThreeArg;
 use std::fs::File;
 use std::io::prelude::*;
 
 mod nybble;
+mod opcode;
 
-const CLOCK_SPEED: f64 = 1.0;
+const CLOCK_SPEED: f64 = 540.0;
 const SPR_ZERO_START: u16 = 0000;
 const SPR_ONE_START: u16 = 0005;
 const SPR_TWO_START: u16 = 0010;
@@ -55,113 +60,6 @@ const FLAG_REG: usize = 0xF;
 
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
-
-const CLEAR_SCREEN: u16 = 0x00E0;
-const RET_SUBROUTINE: u16 = 0x00EE;
-const SKIP_IF_VX: u16 = 0xE09E;
-const SKIP_IF_NOT_VX: u16 = 0xE0A1;
-const SET_VX_DT: u16 = 0xF007;
-const WAIT_FOR_KEY: u16 = 0xF00A;
-const SET_DT: u16 = 0xF015;
-const SET_ST: u16 = 0xF018;
-const SET_I: u16 = 0xF01E;
-const SET_SPR_I: u16 = 0xF029;
-const STORE_DEC_VX: u16 = 0xF033;
-const STORE_V0_VX: u16 = 0xF055;
-const READ_V0_VX: u16 = 0xF065;
-const SKIP_VX_EQ_VY: u16 = 0x5000;
-const VX_EQ_VY: u16 = 0x8000;
-const VX_OR_EQ_VY: u16 = 0x8001;
-const VX_AND_EQ_VY: u16 = 0x8002;
-const VX_XOR_EQ_VY: u16 = 0x8003;
-const VX_PLUS_EQ_VY_F: u16 = 0x8004;
-const VX_SUB_EQ_VY_F: u16 = 0x8005;
-const SHIFT_VX_R: u16 = 0x8006;
-const VX_EQ_VY_SUB_VX_F: u16 = 0x8007;
-const SHIFT_VX_L: u16 = 0x800E;
-const SKIP_VX_NOT_VY: u16 = 0x9000;
-const JUMP_TO_CODEROUTE: u16 = 0x0000;
-const JUMP_TO_ADDR: u16 = 0x1000;
-const CALL_SUB_AT_ADDR: u16 = 0x2000;
-const SKIP_VX_EQ_KK: u16 = 0x3000;
-const SKIP_VX_NEQ_KK: u16 = 0x4000;
-const VX_EQ_KK: u16 = 0x6000;
-const VX_PLUS_EQ_KK: u16 = 0x7000;
-const I_EQ_NNN: u16 = 0xA000;
-const PC_EQ_V0_PLUS_NNN: u16 = 0xB000;
-const VX_EQ_RAND_PLUS_KK: u16 = 0xC000;
-const DRAW_VX_VY_NIB: u16 = 0xD000;
-
-#[derive(Debug, Clone)]
-enum Opcode {
-    NoArg(NoArg),
-    OneArg(OneArg),
-    TwoArg(TwoArg),
-    ThreeArg(ThreeArg),
-}
-
-#[derive(Debug, Copy, Clone)]
-enum NoArg {
-    ClearScreen, //00E0
-    ReturnSubrt, //00EE
-}
-
-#[derive(Debug, Clone)]
-enum OneArg {
-    SkipIfVx(Nybble),   //Ex9E
-    SkipIfNVx(Nybble),  //ExA1
-    SetVxDT(Nybble),    //Fx07
-    WaitForKey(Nybble), //Fx0A
-    SetDT(Nybble),      //Fx15
-    SetST(Nybble),      //Fx18
-    SetI(Nybble),       //Fx1E
-    SetSpriteI(Nybble), //Fx29
-    StoreDecVx(Nybble), //Fx33
-    StoreV0Vx(Nybble),  //Fx55
-    ReadV0Vx(Nybble),   //Fx65
-}
-
-#[derive(Debug, Clone)]
-enum TwoArg {
-    SkipEqVxVy(TwoNybbles),      // 5xy0
-    VxEqVy(TwoNybbles),          //8xy0
-    VxOREqVy(TwoNybbles),        //8xy1
-    VxANDEqVy(TwoNybbles),       //8xy2
-    VxXOREqVy(TwoNybbles),       //8xy3
-    VxPlusEqVySetF(TwoNybbles),  //8xy4
-    VxSubEqVySetF(TwoNybbles),   //8xy5
-    ShiftVxR(TwoNybbles),        //8xy6
-    VxEqVySubVxSetF(TwoNybbles), //8xy7
-    ShiftVxL(TwoNybbles),        //8xyE
-    SkipVxNEqVy(TwoNybbles),     //9xy0
-}
-
-#[derive(Debug, Clone)]
-enum ThreeArg {
-    JumpToCodeRout(ThreeNybbles), //0nnn
-    JumpToAddr(ThreeNybbles),     //1nnn
-    CallSubAt(ThreeNybbles),      //2nnn
-    SkipVxEqKK(ThreeNybbles),     //3xkk
-    SkipVxNEqKK(ThreeNybbles),    //4xkk
-    SetVxKK(ThreeNybbles),        //6xkk
-    VxEqVxPlusKK(ThreeNybbles),   //7xkk
-    SetIToNNN(ThreeNybbles),      //Annn
-    PCEqNNNPlusV0(ThreeNybbles),  //Bnnn
-    VxEqRandANDKK(ThreeNybbles),  //Cxkk
-    DrawVxVyNib(ThreeNybbles),    //Dxyn
-}
-
-#[derive(Debug, Clone)]
-enum InvalidOpcode {
-    DoesntExist(String),
-    StackOverflow(String, Stack, Opcode, ProgramCounter, Ram),
-    StackUnderflow(String, Stack, Opcode, ProgramCounter, Ram),
-    OutOfBoundsAddress(String, Opcode, ProgramCounter, Ram),
-    UnevenAddress(String, Opcode, ProgramCounter, Ram),
-    NoSuchDigitSprite(String, Opcode, ProgramCounter, Ram),
-    OutOfScreenBounds(String, Opcode, ProgramCounter, Ram, Screen),
-    UndefBehavior(String, Opcode, ProgramCounter, Ram),
-}
 
 #[derive(Debug, Clone, Copy)]
 struct Registers {
@@ -230,10 +128,10 @@ impl Ram {
 
     fn retrieve_bytes(self, index: u16, amount: Nybble) -> Vec<u8> {
         let mut byte_vec = Vec::new();
-        for byte in self.0[index as usize]
-            ..self.0[amount.to_usize().expect("Check usize")]
+//        println!("{:?}", byte);
+        for i in index as usize..(index as usize + amount.to_usize().expect("Check usize"))
         {
-            byte_vec.push(byte);
+            byte_vec.push(self.0[i]);
         }
         byte_vec
     }
@@ -270,11 +168,11 @@ impl Stack {
         Stack { 0: [0; 16] }
     }
     fn push(&mut self, sp: &mut u8, pc: &ProgramCounter) -> Result<(), String> {
+        *sp = *sp + 1;
         if *sp > 15 {
             return Err("Stack overflow".to_string());
         }
         self.0[*sp as usize] = pc.get_addr();
-        *sp = *sp + 1;
         Ok(())
     }
 
@@ -304,7 +202,7 @@ impl fmt::Debug for Screen {
             }
             screen_string.push_str("\n");
         }
-        write!(f, "Pixel Buffer Dump\n{}", screen_string)
+        write!(f, "{}", screen_string)
     }
 }
 
@@ -314,6 +212,7 @@ impl Screen {
             0: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT],
         }
     }
+
     fn draw_nybble(
         &mut self,
         x: u8,
@@ -331,27 +230,13 @@ impl Screen {
             for bit in 0..8 {
                 let pixel_val = get_bit(sprite[byte_num], bit)
                     .expect("Iterator went over 8");
-                let mut x_cord;
-                let mut y_cord;
-                if y as usize + byte_num >= SCREEN_HEIGHT {
-                    y_cord =
-                        Some((y as usize + byte_num) % (SCREEN_HEIGHT - 1));
-                } else {
-                    y_cord = Some(y as usize + byte_num);
-                }
-                if (x + bit) as usize >= SCREEN_WIDTH {
-                    x_cord = Some((x + bit) as usize % (SCREEN_WIDTH - 1));
-                } else {
-                    x_cord = Some((x + bit) as usize);
-                }
-                *collision_flag =
-                    ((self.0[y_cord.expect("Should've gotten an x value")]
-                        [x_cord.expect("Should've gotten a y value")]
-                        ^ pixel_val)
-                        || (*collision_flag == 1)) as u8;
+                let y_cord = Some((y as usize + byte_num) % (SCREEN_HEIGHT));
+                let x_cord = Some((x + bit) as usize % (SCREEN_WIDTH));
+                *collision_flag |= (pixel_val & self.0[y_cord.expect("Should've gotten an x value")]
+                        [x_cord.expect("Should've gotten a y value")]) as u8;
 
                 self.0[y_cord.expect("Should've gotten an x value")]
-                    [x_cord.expect("Should've gotten a y value")] = pixel_val
+                    [x_cord.expect("Should've gotten a y value")] ^= pixel_val
             }
         }
 
@@ -375,11 +260,13 @@ impl Keyboard {
 
     fn press_key(&mut self, key: Key, vreg: &mut [u8; 16]) {
         if let Some(key) = key_to_usize(key) {
-            self.key_buffer[key] = true; 
+            self.key_buffer[key] = true;
         }
         if self.wait_press != None {
             match key_to_usize(key) {
-                Some(key) => {vreg[self.wait_press.unwrap() as usize] = key as u8}
+                Some(key) => {
+                    vreg[self.wait_press.unwrap() as usize] = key as u8
+                }
                 None => (),
             }
             self.wait_press = None;
@@ -388,7 +275,7 @@ impl Keyboard {
 
     fn release_key(&mut self, key: Key) {
         if let Some(key) = key_to_usize(key) {
-            self.key_buffer[key] = false; 
+            self.key_buffer[key] = false;
         }
     }
 }
@@ -414,7 +301,7 @@ fn key_to_usize(key: Key) -> Option<usize> {
         _ => None,
     }
 }
-    
+
 fn main() {
     let mut ram: Ram = Ram::new();
     let mut regs: Registers = Registers::new();
@@ -428,8 +315,8 @@ fn main() {
 
     let mut window: PistonWindow = WindowSettings::new(
         "Rust-8 Emulator",
-        [SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32])
-        .exit_on_esc(true)
+        [SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32],
+    ).exit_on_esc(true)
         .build()
         .unwrap();
     window.set_ups(60);
@@ -437,53 +324,32 @@ fn main() {
     while let Some(e) = window.next() {
         if let Some(_) = e.render_args() {
             if draw_flag {
-                println!("{:?}", &screen);
                 draw_pixel_buffer(&screen);
+                println!("{:?}", screen);
                 draw_flag = false;
             }
         }
 
         if let Some(up_args) = e.update_args() {
-            if keyboard.wait_press == None {
-                if regs.delay != 0 {
-                    regs.delay -= 1;
-                }
-                let mut num_inst = (up_args.dt * CLOCK_SPEED).round() as usize;
-                if num_inst == 0 {
-                    num_inst = 1;
-                }
-                for _ in 0..num_inst {
-                    if keyboard.wait_press == None {
-                        match decode_op(fetch_opcode(&regs.pc, &ram)) {
-                            Ok(op) => match execute(
-                                op,
-                                &mut ram,
-                                &mut regs,
-                                &mut stack,
-                                &mut screen,
-                                &mut keyboard,
-                                &mut draw_flag,
-                            ) {
-                                Ok(_) => (),
-                                Err(err) => {
-                                    println!("Found an error during execution: {:?}", err);
-                                    return
-                                }
-                            },
-                            Err(inv_op) => {
-                                println!("Found an error during decoding: {:?}", inv_op);
-                                return
-                            }
-                        };
-                        regs.pc.update();
-                    }
-                }
+            match emulate_cycles(
+                up_args.dt,
+                &mut ram,
+                &mut regs,
+                &mut stack,
+                &mut screen,
+                &mut keyboard,
+                &mut draw_flag,
+            ) {
+                Ok(_) => (),
+                Err(err) => {println!("{:?}", err); return ();}
             }
         }
 
         if let Some(k) = e.press_args() {
             match k {
-                Button::Keyboard(input) => keyboard.press_key(input, &mut regs.v_regs),
+                Button::Keyboard(input) => {
+                    keyboard.press_key(input, &mut regs.v_regs)
+                }
                 _ => (),
             }
         }
@@ -497,127 +363,43 @@ fn main() {
     }
 }
 
-fn draw_pixel_buffer(screen: &Screen) {
+fn emulate_cycles(
+    dt: f64,
+    ram: &mut Ram,
+    regs: &mut Registers,
+    stack: &mut Stack,
+    screen: &mut Screen,
+    keyboard: &mut Keyboard,
+    draw_flag: &mut bool,
+) -> Result<(), InvalidOpcode> {
+    if keyboard.wait_press == None {
+        if regs.delay != 0 {
+            regs.delay -= 1;
+        }
+        let num_inst = (dt * CLOCK_SPEED).round() as usize;
 
+        for _ in 0..num_inst {
+            if keyboard.wait_press == None {
+                let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram))?;
+                match execute(op, ram, regs, stack, screen, keyboard, draw_flag) {
+                    Ok(_) => (),
+                    Err(err) => return Err(err),
+                };
+            }
+        }
+        Ok(())
+    }
+    else {
+        Ok(())
+    }
 }
+
+fn draw_pixel_buffer(screen: &Screen) {}
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     let l_byte: u8 = ram.0[pc.get_addr() as usize];
     let r_byte: u8 = ram.0[(pc.get_addr() + 1) as usize];
     ((l_byte as u16) << 8) | (r_byte as u16)
-}
-
-// TODO: Run tests on games and see which opcodes appear most frequently.
-// Reorder this table so that the frequent ones are higher in order
-
-fn decode_op(op: u16) -> Result<Opcode, InvalidOpcode> {
-    match op {
-        CLEAR_SCREEN => Ok(Opcode::NoArg(NoArg::ClearScreen)),
-        RET_SUBROUTINE => Ok(Opcode::NoArg(NoArg::ReturnSubrt)),
-        op if ((op & READ_V0_VX) == READ_V0_VX) => {
-            Ok(Opcode::OneArg(OneArg::ReadV0Vx(Nybble::from(op))))
-        }
-        op if ((op & STORE_V0_VX) == STORE_V0_VX) => {
-            Ok(Opcode::OneArg(OneArg::StoreV0Vx(Nybble::from(op))))
-        }
-        op if ((op & STORE_DEC_VX) == STORE_DEC_VX) => {
-            Ok(Opcode::OneArg(OneArg::StoreDecVx(Nybble::from(op))))
-        }
-        op if ((op & SET_SPR_I) == SET_SPR_I) => {
-            Ok(Opcode::OneArg(OneArg::SetSpriteI(Nybble::from(op))))
-        }
-        op if ((op & SET_I) == SET_I) => {
-            Ok(Opcode::OneArg(OneArg::SetI(Nybble::from(op))))
-        }
-        op if ((op & SET_ST) == SET_ST) => {
-            Ok(Opcode::OneArg(OneArg::SetST(Nybble::from(op))))
-        }
-        op if ((op & SET_DT) == SET_DT) => {
-            Ok(Opcode::OneArg(OneArg::SetDT(Nybble::from(op))))
-        }
-        op if ((op & WAIT_FOR_KEY) == WAIT_FOR_KEY) => {
-            Ok(Opcode::OneArg(OneArg::WaitForKey(Nybble::from(op))))
-        }
-        op if ((op & SET_VX_DT) == SET_VX_DT) => {
-            Ok(Opcode::OneArg(OneArg::SetVxDT(Nybble::from(op))))
-        }
-        op if ((op & VX_PLUS_EQ_KK) == VX_PLUS_EQ_KK) => Ok(Opcode::ThreeArg(
-            ThreeArg::VxEqVxPlusKK(ThreeNybbles::from(op)),
-        )),
-        op if ((op & VX_EQ_KK) == VX_EQ_KK) => {
-            Ok(Opcode::ThreeArg(ThreeArg::SetVxKK(ThreeNybbles::from(op))))
-        }
-        op if ((op & SKIP_VX_EQ_VY) == SKIP_VX_EQ_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::SkipEqVxVy(TwoNybbles::from(op))))
-        }
-        op if ((op & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Ok(
-            Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(ThreeNybbles::from(op))),
-        ),
-        op if ((op & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Ok(Opcode::ThreeArg(
-            ThreeArg::SkipVxEqKK(ThreeNybbles::from(op)),
-        )),
-        op if ((op & CALL_SUB_AT_ADDR) == CALL_SUB_AT_ADDR) => Ok(
-            Opcode::ThreeArg(ThreeArg::CallSubAt(ThreeNybbles::from(op))),
-        ),
-        op if ((op & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Ok(Opcode::ThreeArg(
-            ThreeArg::JumpToAddr(ThreeNybbles::from(op)),
-        )),
-        op if ((op & JUMP_TO_CODEROUTE) == JUMP_TO_CODEROUTE) => Ok(
-            Opcode::ThreeArg(ThreeArg::JumpToCodeRout(ThreeNybbles::from(op))),
-        ),
-        op if ((op & SKIP_IF_NOT_VX) == SKIP_IF_NOT_VX) => {
-            Ok(Opcode::OneArg(OneArg::SkipIfNVx(Nybble::from(op))))
-        }
-        op if ((op & SKIP_IF_VX) == SKIP_IF_VX) => {
-            Ok(Opcode::OneArg(OneArg::SkipIfVx(Nybble::from(op))))
-        }
-        op if ((op & DRAW_VX_VY_NIB) == DRAW_VX_VY_NIB) => Ok(
-            Opcode::ThreeArg(ThreeArg::DrawVxVyNib(ThreeNybbles::from(op))),
-        ),
-        op if ((op & VX_EQ_RAND_PLUS_KK) == VX_EQ_RAND_PLUS_KK) => Ok(
-            Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(ThreeNybbles::from(op))),
-        ),
-        op if ((op & PC_EQ_V0_PLUS_NNN) == PC_EQ_V0_PLUS_NNN) => Ok(
-            Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(ThreeNybbles::from(op))),
-        ),
-        op if ((op & I_EQ_NNN) == I_EQ_NNN) => Ok(Opcode::ThreeArg(
-            ThreeArg::SetIToNNN(ThreeNybbles::from(op)),
-        )),
-        op if ((op & SKIP_VX_NOT_VY) == SKIP_VX_NOT_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::SkipVxNEqVy(TwoNybbles::from(op))))
-        }
-        op if ((op & SHIFT_VX_L) == SHIFT_VX_L) => {
-            Ok(Opcode::TwoArg(TwoArg::ShiftVxL(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_EQ_VY_SUB_VX_F) == VX_EQ_VY_SUB_VX_F) => Ok(
-            Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(TwoNybbles::from(op))),
-        ),
-        op if ((op & SHIFT_VX_R) == SHIFT_VX_R) => {
-            Ok(Opcode::TwoArg(TwoArg::ShiftVxR(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_SUB_EQ_VY_F) == VX_SUB_EQ_VY_F) => {
-            Ok(Opcode::TwoArg(TwoArg::VxSubEqVySetF(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_PLUS_EQ_VY_F) == VX_PLUS_EQ_VY_F) => {
-            Ok(Opcode::TwoArg(TwoArg::VxPlusEqVySetF(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_XOR_EQ_VY) == VX_XOR_EQ_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::VxXOREqVy(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_AND_EQ_VY) == VX_AND_EQ_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::VxANDEqVy(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_OR_EQ_VY) == VX_OR_EQ_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::VxOREqVy(TwoNybbles::from(op))))
-        }
-        op if ((op & VX_EQ_VY) == VX_EQ_VY) => {
-            Ok(Opcode::TwoArg(TwoArg::VxEqVy(TwoNybbles::from(op))))
-        }
-        _ => Err(InvalidOpcode::DoesntExist(format!(
-            "Unsupported op {:X}",
-            op
-        ))),
-    }
 }
 
 fn execute(
@@ -629,64 +411,71 @@ fn execute(
     keyboard: &mut Keyboard,
     draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
+    //println!("{:?}", regs);
+    //println!("{:?}\n", opcode);
     match opcode {
         Opcode::NoArg(NoArg::ClearScreen) => {
             screen.0.iter_mut().for_each(|inner_array| {
                 inner_array.iter_mut().for_each(|pixel| *pixel = false)
             });
-            *draw_flag = true;
+            regs.pc.update();
             Ok(())
         }
         Opcode::NoArg(NoArg::ReturnSubrt) => match stack.pop(&mut regs.sp) {
             Ok(pc) => {
                 regs.pc = pc;
+                regs.pc.update();
                 Ok(())
             }
             Err(err) => Err(InvalidOpcode::StackUnderflow(
                 err,
-                stack.clone(),
                 opcode,
-                regs.pc,
-                *ram,
             )),
         },
 
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
             skip_if_vx(arg, keyboard, &mut regs.pc);
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
             skip_if_not_vx(arg, keyboard, &mut regs.pc);
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SetVxDT(arg)) => {
             regs.v_regs[arg.to_usize().expect("Check usize")] = regs.delay;
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::WaitForKey(arg)) => {
             keyboard.wait_press = Some(arg.to_u8().expect("Check u8"));
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SetDT(arg)) => {
             regs.delay = regs.v_regs[arg.to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SetST(arg)) => {
             regs.sound = regs.v_regs[arg.to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SetI(arg)) => {
             regs.i_reg +=
                 (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16;
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => match i_eq_spr_digit_vx(
             regs.v_regs[arg.to_usize().expect("Check usize")],
             &mut regs.i_reg,
         ) {
-            Ok(_) => Ok(()),
+            Ok(_) => {regs.pc.update(); Ok(())},
             Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(
-                err, opcode, regs.pc, *ram,
+                err, opcode,
             )),
         },
         Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
@@ -695,14 +484,17 @@ fn execute(
                 regs.i_reg,
                 regs.v_regs[arg.to_usize().expect("Check usize")],
             );
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
             store_v0_vx_in_ram(arg, ram, &mut regs.v_regs, &regs.i_reg);
+            regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::ReadV0Vx(arg)) => {
             read_from_ram_in_v0_vx(arg, ram, &mut regs.v_regs, &regs.i_reg);
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => {
@@ -711,26 +503,31 @@ fn execute(
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
                 &mut regs.pc,
             );
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxEqVy(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxOREqVy(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize")] |=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxANDEqVy(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize")] &=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxXOREqVy(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize")] ^=
                 regs.v_regs[arg.y().to_usize().expect("Check usize")];
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
@@ -741,6 +538,7 @@ fn execute(
                 );
             regs.v_regs[FLAG_REG] = flag as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxSubEqVySetF(arg)) => {
@@ -751,6 +549,7 @@ fn execute(
                 );
             regs.v_regs[FLAG_REG] = (!flag) as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
@@ -759,6 +558,7 @@ fn execute(
                 == 0b00000001) as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.x().to_usize().expect("Check usize")] >> 1;
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
@@ -769,6 +569,7 @@ fn execute(
                 );
             regs.v_regs[FLAG_REG] = (!flag) as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] = y;
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
@@ -777,6 +578,7 @@ fn execute(
                 == 0b10000000) as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
+            regs.pc.update();
             Ok(())
         }
         Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
@@ -785,19 +587,11 @@ fn execute(
                 regs.v_regs[arg.y().to_usize().expect("Check usize")],
                 &mut regs.pc,
             );
+            regs.pc.update();
             Ok(())
         }
-        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(_)) => Ok(()),
+        Opcode::ThreeArg(ThreeArg::JumpToCodeRout(_)) => {regs.pc.update(); Ok(())}
         Opcode::ThreeArg(ThreeArg::JumpToAddr(arg)) => {
-            let addr = arg.to_addr();
-            if addr % 2 != 0 {
-                return Err(InvalidOpcode::UnevenAddress(
-                    "Uneven address".to_string(),
-                    opcode,
-                    regs.pc,
-                    *ram,
-                ));
-            }
             regs.pc.set_addr(arg.to_addr());
             Ok(())
         }
@@ -808,7 +602,7 @@ fn execute(
                     Ok(())
                 }
                 Err(err) => Err(InvalidOpcode::StackOverflow(
-                    err, *stack, opcode, regs.pc, *ram,
+                    err, opcode,
                 )),
             }
         }
@@ -818,6 +612,7 @@ fn execute(
                 arg.get_byte(),
                 &mut regs.pc,
             );
+            regs.pc.update();
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => {
@@ -826,51 +621,32 @@ fn execute(
                 arg.get_byte(),
                 &mut regs.pc,
             );
+            regs.pc.update();
             Ok(())
         }
 
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize") as usize] =
                 arg.get_byte();
+            regs.pc.update();
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
-            let sum: usize = arg.get_byte() as usize
-                + regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                    as usize;
-            if sum >= 256 {
-                return Err(InvalidOpcode::UndefBehavior(
-                    "Vx += KK overflowed".to_string(),
-                    opcode,
-                    regs.pc,
-                    *ram,
-                ));
-            } else {
-                regs.v_regs[arg.x().to_usize().expect("Check usize")] =
-                    sum as u8;
-                Ok(())
-            }
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] = regs.v_regs[arg.x().to_usize().expect("Check usize")].overflowing_add(arg.get_byte()).0;
+            regs.pc.update();
+            Ok(())
         }
         Opcode::ThreeArg(ThreeArg::SetIToNNN(arg)) => {
             regs.i_reg = arg.to_addr();
+            regs.pc.update();
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
             let sum = (regs.v_regs[0] as usize) + arg.to_addr() as usize;
-            if sum % 2 != 0 {
-                return Err(InvalidOpcode::UnevenAddress(
-                    "Uneven address".to_string(),
-                    opcode,
-                    regs.pc,
-                    *ram,
-                ));
-            }
             if sum > 0xffe || sum < 0x200 {
                 return Err(InvalidOpcode::OutOfBoundsAddress(
                     "Out of bounds program counter".to_string(),
                     opcode,
-                    regs.pc,
-                    *ram,
                 ));
             }
             regs.pc.set_addr(sum as u16);
@@ -882,11 +658,10 @@ fn execute(
                 return Err(InvalidOpcode::UndefBehavior(
                     "Overflow on random and".to_string(),
                     opcode,
-                    regs.pc,
-                    *ram,
                 ));
             }
             regs.v_regs[arg.x().to_usize().expect("Check usize")] = res as u8;
+            regs.pc.update();
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match screen
@@ -900,10 +675,11 @@ fn execute(
             ) {
             Ok(_) => {
                 *draw_flag = true;
+                regs.pc.update();
                 Ok(())
             }
             Err(err) => Err(InvalidOpcode::OutOfScreenBounds(
-                err, opcode, regs.pc, *ram, *screen,
+                err, opcode,
             )),
         },
     }
@@ -1008,8 +784,8 @@ fn store_v0_vx_in_ram(
 // "out of bounds" for indexing a u8.
 
 fn get_bit(n: u8, b: u8) -> Result<bool, String> {
-    if n > 7 {
-        return Err(format!("Attempted to pass in a val greater than 7 {}", n));
+    if b > 7 {
+        return Err(format!("Attempted to pass in a val greater than 7 {}", b));
     }
     Ok((n >> (7 - b)) & 1 == 1)
 }
@@ -1042,6 +818,7 @@ fn test_triple_nybble() {
 }
 
 #[test]
+#[should_panic]
 fn test_decode_op() {
     let chip8_addr: u16 = 0x200;
     let amount_of_ops: u16 = 35;
@@ -1061,7 +838,8 @@ fn test_decode_op() {
         x += 1;
     }
     loop {
-        decode_op(fetch_opcode(&regs.pc, &ram))?;
+        let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram));
+        //println!("{:?}", op);
         regs.pc.update();
         if (regs.pc.get_addr() == (chip8_addr + (amount_of_ops * 2))) {
             break;

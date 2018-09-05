@@ -1,7 +1,7 @@
 use num::ToPrimitive;
 use std::fmt;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Nybble([u8; 1]);
 
 impl Nybble {
@@ -20,6 +20,12 @@ impl From<u16> for Nybble {
     }
 }
 
+impl fmt::Debug for Nybble {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Nybble hex: {:X} dec: {}", self.0[0], self.0[0])
+    }
+}
+
 impl ToPrimitive for Nybble {
     fn to_i64(&self) -> Option<i64> {
         panic!("Nybbles should only be accessed as unsigned values");
@@ -35,7 +41,7 @@ impl ToPrimitive for Nybble {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct TwoNybbles([u8; 1]);
 
 impl TwoNybbles {
@@ -54,7 +60,13 @@ impl From<u16> for TwoNybbles {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+impl fmt::Debug for TwoNybbles {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "TwoNybble hex: {:X} dec: {}", self.0[0], self.0[0])
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct ThreeNybbles([u8; 2]);
 
 impl ThreeNybbles {
@@ -89,5 +101,12 @@ impl ThreeNybbles {
 impl From<u16> for ThreeNybbles {
     fn from(op: u16) -> ThreeNybbles {
         ThreeNybbles::new([((op & 0x0F00) >> 8) as u8, (op & 0x00FF) as u8])
+    }
+}
+
+impl fmt::Debug for ThreeNybbles {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let comb_nyb = ((self.0[0] as u16) << 8) | (self.0[1] as u16);
+        write!(f, "ThreeNybble hex: {:X} dec: {}", comb_nyb, comb_nyb)
     }
 }
