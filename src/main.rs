@@ -239,7 +239,6 @@ impl Screen {
                     [x_cord.expect("Should've gotten a y value")] ^= pixel_val
             }
         }
-
         Ok(())
     }
 }
@@ -467,6 +466,7 @@ fn execute(
             regs.i_reg +=
                 (regs.v_regs[arg.to_usize().expect("Check usize")]) as u16;
             regs.pc.update();
+
             Ok(())
         }
         Opcode::OneArg(OneArg::SetSpriteI(arg)) => match i_eq_spr_digit_vx(
@@ -574,9 +574,9 @@ fn execute(
             Ok(())
         }
         Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
-            regs.v_regs[FLAG_REG] = (0b1000000
+            regs.v_regs[FLAG_REG] = (0b10000000
                 & regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                == 0b10000000) as u8;
+                ) >> 7 as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
             regs.pc.update();
@@ -688,8 +688,6 @@ fn execute(
     }
 }
 
-//  Possible optimization of next three, abstract into higher order function
-
 fn skip_vx_eq_kk(v_x: u8, byte: u8, pc: &mut ProgramCounter) {
     if v_x == byte {
         pc.update();
@@ -767,7 +765,7 @@ fn read_from_ram_in_v0_vx(
     v_regs: &mut [u8; 16],
     i_reg: &u16,
 ) {
-    for index in 0..byte_arg.to_usize().expect("Check usize") {
+    for index in 0..=byte_arg.to_usize().expect("Check usize") {
         v_regs[index as usize] = ram.0[(*i_reg + index as u16) as usize];
     }
 }
@@ -778,7 +776,7 @@ fn store_v0_vx_in_ram(
     v_regs: &mut [u8; 16],
     i_reg: &u16,
 ) {
-    for index in 0..byte_arg.to_u64().expect("Check to_u64") {
+    for index in 0..=byte_arg.to_u64().expect("Check to_u64") {
         ram.0[(*i_reg + index as u16) as usize] = v_regs[index as usize]
     }
 }
