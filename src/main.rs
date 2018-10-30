@@ -378,6 +378,9 @@ fn emulate_cycles(
         if regs.delay != 0 {
             regs.delay -= 1;
         }
+        if regs.sound != 0 {
+            regs.sound -= 1;
+        }
         let num_inst = (dt * CLOCK_SPEED).round() as usize;
 
         for _ in 0..num_inst {
@@ -840,7 +843,6 @@ fn test_decode_op() {
     }
     loop {
         let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram));
-        //println!("{:?}", op);
         regs.pc.update();
         if (regs.pc.get_addr() == (chip8_addr + (amount_of_ops * 2))) {
             break;
