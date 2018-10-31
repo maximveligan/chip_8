@@ -17,6 +17,7 @@ use opcode::TwoArg;
 use opcode::ThreeArg;
 use std::fs::File;
 use std::io::prelude::*;
+use std::env;
 
 mod nybble;
 mod opcode;
@@ -102,9 +103,15 @@ impl fmt::Debug for Ram {
 }
 
 impl Ram {
-    fn new() -> Ram {
-        Ram { 0: [0; 0xFFF] }
+    fn initialize_ram(path: &str) -> Result<Ram, String> {
+        let mut ram = Ram { 0: [0; 0xFFF] };
+        ram.load_digit_data();
+        match ram.load_rom(path) {
+            Ok(_) => Ok(ram),
+            Err(err) => Err(err),
+        }
     }
+
     fn load_digit_data(&mut self) {
         self.0[0000..0005].copy_from_slice(&SPR_ZERO);
         self.0[0005..0010].copy_from_slice(&SPR_ONE);
@@ -134,12 +141,18 @@ impl Ram {
         byte_vec
     }
 
-    fn load_rom(&mut self, file: &str) {
-        let mut rom = File::open(file).expect("Rom not found");
-        let mut raw_bytes = Vec::new();
-        rom.read_to_end(&mut raw_bytes)
-            .expect("Something went wrong while reading the rom");
-        self.0[0x200..0x200 + raw_bytes.len()].copy_from_slice(&raw_bytes);
+    fn load_rom(&mut self, file: &str) -> Result<(), String>{
+        match File::open(file) {
+            Ok(mut rom) => {
+                let mut raw_bytes = Vec::new();
+                rom.read_to_end(&mut raw_bytes)
+                    .expect("Something went wrong while reading the rom");
+                self.0[0x200..0x200 + raw_bytes.len()]
+                    .copy_from_slice(&raw_bytes);
+                Ok(())
+            },
+            Err(e) => Err(format!("No such file: {0}. {1}", file, e)),
+        }
     }
 }
 
@@ -302,15 +315,19 @@ fn key_to_usize(key: Key) -> Option<usize> {
 }
 
 fn main() {
-    let mut ram: Ram = Ram::new();
+    let mut ram = match env::args().nth(1) {
+        Some(path) => match Ram::initialize_ram(&path) {
+            Ok(r) => r,
+            Err(e) => {println!("{}", e); return},
+        }
+        _ => {println!("Didn't recieve a rom"); return},
+    };
+
     let mut regs: Registers = Registers::new();
     let mut stack: Stack = Stack::new();
     let mut screen: Screen = Screen::new();
     let mut keyboard: Keyboard = Keyboard::new();
     let mut draw_flag: bool = false;
-    ram.load_rom("/home/grodion/dev/chip_8/pong.ch8");
-    ram.load_digit_data();
-    regs.pc.set_addr(0x200);
 
     let mut window: PistonWindow = WindowSettings::new(
         "Rust-8 Emulator",
