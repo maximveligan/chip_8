@@ -237,6 +237,7 @@ impl Screen {
             return Err(format!("Out of screen bounds: {0}, {1}", x, y));
         }
         let sprite = ram.retrieve_bytes(ram_index, num_bytes);
+        *collision_flag = 0;
         for byte_num in 0..sprite.len() {
             for bit in 0..8 {
                 let pixel_val = get_bit(sprite[byte_num], bit)
@@ -252,6 +253,8 @@ impl Screen {
                     [x_cord.expect("Should've gotten a y value")] ^= pixel_val
             }
         }
+
+        println!("{:?}", self);
         Ok(())
     }
 }
@@ -341,7 +344,6 @@ fn main() {
         if let Some(_) = e.render_args() {
             if draw_flag {
                 draw_pixel_buffer(&screen);
-                println!("{:?}", screen);
                 draw_flag = false;
             }
         }
@@ -433,8 +435,6 @@ fn execute(
     keyboard: &mut Keyboard,
     draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
-    //println!("{:?}", regs);
-    //println!("{:?}\n", opcode);
     match opcode {
         Opcode::NoArg(NoArg::ClearScreen) => {
             screen.0.iter_mut().for_each(|inner_array| {
@@ -646,7 +646,6 @@ fn execute(
             regs.pc.update();
             Ok(())
         }
-
         Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
             regs.v_regs[arg.x().to_usize().expect("Check usize") as usize] =
                 arg.get_byte();
@@ -678,14 +677,7 @@ fn execute(
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
-            let res = arg.get_byte() as usize & rand::random::<u8>() as usize;
-            if res > 255 {
-                return Err(InvalidOpcode::UndefBehavior(
-                    "Overflow on random and".to_string(),
-                    opcode,
-                ));
-            }
-            regs.v_regs[arg.x().to_usize().expect("Check usize")] = res as u8;
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] = arg.get_byte() & rand::random::<u8>();
             regs.pc.update();
             Ok(())
         }
