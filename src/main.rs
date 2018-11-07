@@ -62,6 +62,8 @@ const FLAG_REG: usize = 0xF;
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
 
+const PIXEL_SIZE: f64 = 10.0;
+
 #[derive(Debug, Clone, Copy)]
 struct Registers {
     pc: ProgramCounter,
@@ -254,7 +256,6 @@ impl Screen {
             }
         }
 
-        println!("{:?}", self);
         Ok(())
     }
 }
@@ -334,7 +335,7 @@ fn main() {
 
     let mut window: PistonWindow = WindowSettings::new(
         "Rust-8 Emulator",
-        [SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32],
+        [(SCREEN_WIDTH * PIXEL_SIZE as usize) as u32, (SCREEN_HEIGHT * PIXEL_SIZE as usize) as u32],
     ).exit_on_esc(true)
         .build()
         .unwrap();
@@ -342,10 +343,28 @@ fn main() {
 
     while let Some(e) = window.next() {
         if let Some(_) = e.render_args() {
-            if draw_flag {
-                draw_pixel_buffer(&screen);
-                draw_flag = false;
-            }
+            window.draw_2d(&e, |c, g| {
+                clear([0.5, 0.5, 0.5, 1.0], g);
+
+                for y in 0..SCREEN_HEIGHT {
+                    for x in 0..SCREEN_WIDTH {
+                        if screen.0[y][x] {
+                            rectangle([1.0, 1.0, 1.0, 1.0],
+                                      [(x as f64) * PIXEL_SIZE, (y as f64) * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE],
+                                      c.transform, g);
+                        }
+
+                        else {
+                            rectangle([0.0, 0.0, 0.0, 1.0],
+                                      [(x as f64) * PIXEL_SIZE, (y as f64) * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE],
+                                      c.transform, g);
+
+                        }
+                    }
+                }
+            });
+
+            draw_flag = false;
         }
 
         if let Some(up_args) = e.update_args() {
@@ -417,8 +436,6 @@ fn emulate_cycles(
         Ok(())
     }
 }
-
-fn draw_pixel_buffer(screen: &Screen) {}
 
 fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     let l_byte: u8 = ram.0[pc.get_addr() as usize];
