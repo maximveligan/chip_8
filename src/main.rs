@@ -22,7 +22,6 @@ use std::env;
 mod nybble;
 mod opcode;
 
-const CLOCK_SPEED: f64 = 540.0;
 const SPR_ZERO_START: u16 = 0000;
 const SPR_ONE_START: u16 = 0005;
 const SPR_TWO_START: u16 = 0010;
@@ -143,7 +142,7 @@ impl Ram {
         byte_vec
     }
 
-    fn load_rom(&mut self, file: &str) -> Result<(), String>{
+    fn load_rom(&mut self, file: &str) -> Result<(), String> {
         match File::open(file) {
             Ok(mut rom) => {
                 let mut raw_bytes = Vec::new();
@@ -152,7 +151,7 @@ impl Ram {
                 self.0[0x200..0x200 + raw_bytes.len()]
                     .copy_from_slice(&raw_bytes);
                 Ok(())
-            },
+            }
             Err(e) => Err(format!("No such file: {0}. {1}", file, e)),
         }
     }
@@ -274,17 +273,10 @@ impl Keyboard {
         }
     }
 
-    fn press_key(&mut self, key: Key, vreg: &mut [u8; 16]) {
-        if let Some(key) = key_to_usize(key) {
-            self.key_buffer[key] = true;
-        }
+    fn press_key(&mut self, key: usize, vreg: &mut [u8; 16]) {
+        self.key_buffer[key] = true;
         if self.wait_press != None {
-            match key_to_usize(key) {
-                Some(key) => {
-                    vreg[self.wait_press.unwrap() as usize] = key as u8
-                }
-                None => (),
-            }
+            vreg[self.wait_press.unwrap() as usize] = key as u8;
             self.wait_press = None;
         }
     }
@@ -322,9 +314,15 @@ fn main() {
     let mut ram = match env::args().nth(1) {
         Some(path) => match Ram::initialize_ram(&path) {
             Ok(r) => r,
-            Err(e) => {println!("{}", e); return},
+            Err(e) => {
+                println!("{}", e);
+                return;
+            }
+        },
+        _ => {
+            println!("Didn't recieve a rom");
+            return;
         }
-        _ => {println!("Didn't recieve a rom"); return},
     };
 
     let mut regs: Registers = Registers::new();
@@ -332,10 +330,15 @@ fn main() {
     let mut screen: Screen = Screen::new();
     let mut keyboard: Keyboard = Keyboard::new();
     let mut draw_flag: bool = false;
+    let mut clock_speed: f64 = 540.0;
+    let mut pause: bool = false;
 
     let mut window: PistonWindow = WindowSettings::new(
         "Rust-8 Emulator",
-        [(SCREEN_WIDTH * PIXEL_SIZE as usize) as u32, (SCREEN_HEIGHT * PIXEL_SIZE as usize) as u32],
+        [
+            (SCREEN_WIDTH * PIXEL_SIZE as usize) as u32,
+            (SCREEN_HEIGHT * PIXEL_SIZE as usize) as u32,
+        ],
     ).exit_on_esc(true)
         .build()
         .unwrap();
@@ -349,16 +352,29 @@ fn main() {
                 for y in 0..SCREEN_HEIGHT {
                     for x in 0..SCREEN_WIDTH {
                         if screen.0[y][x] {
-                            rectangle([1.0, 1.0, 1.0, 1.0],
-                                      [(x as f64) * PIXEL_SIZE, (y as f64) * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE],
-                                      c.transform, g);
-                        }
-
-                        else {
-                            rectangle([0.0, 0.0, 0.0, 1.0],
-                                      [(x as f64) * PIXEL_SIZE, (y as f64) * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE],
-                                      c.transform, g);
-
+                            rectangle(
+                                [1.0, 1.0, 1.0, 1.0],
+                                [
+                                    (x as f64) * PIXEL_SIZE,
+                                    (y as f64) * PIXEL_SIZE,
+                                    PIXEL_SIZE,
+                                    PIXEL_SIZE,
+                                ],
+                                c.transform,
+                                g,
+                            );
+                        } else {
+                            rectangle(
+                                [0.0, 0.0, 0.0, 1.0],
+                                [
+                                    (x as f64) * PIXEL_SIZE,
+                                    (y as f64) * PIXEL_SIZE,
+                                    PIXEL_SIZE,
+                                    PIXEL_SIZE,
+                                ],
+                                c.transform,
+                                g,
+                            );
                         }
                     }
                 }
@@ -368,19 +384,22 @@ fn main() {
         }
 
         if let Some(up_args) = e.update_args() {
-            match emulate_cycles(
-                up_args.dt,
-                &mut ram,
-                &mut regs,
-                &mut stack,
-                &mut screen,
-                &mut keyboard,
-                &mut draw_flag,
-            ) {
-                Ok(_) => (),
-                Err(err) => {
-                    println!("{:?}", err);
-                    return ();
+            if !pause {
+                match emulate_cycles(
+                    up_args.dt,
+                    &mut ram,
+                    &mut regs,
+                    &mut stack,
+                    &mut screen,
+                    &mut keyboard,
+                    &mut draw_flag,
+                    clock_speed,
+                ) {
+                    Ok(_) => (),
+                    Err(err) => {
+                        println!("{:?}", err);
+                        return ();
+                    }
                 }
             }
         }
@@ -388,7 +407,42 @@ fn main() {
         if let Some(k) = e.press_args() {
             match k {
                 Button::Keyboard(input) => {
-                    keyboard.press_key(input, &mut regs.v_regs)
+                    if let Some(input) = key_to_usize(input) {
+                        keyboard.press_key(input, &mut regs.v_regs)
+                    } else {
+                        match input {
+                            Key::LeftBracket => {
+                                if clock_speed > 0.0 {
+                                    clock_speed -= 10.0
+                                };
+                            }
+                            Key::RightBracket => {
+                                clock_speed += 10.0;
+                            }
+                            Key::P => pause = !pause,
+                            Key::M => {
+                                if pause {
+                                    match emulate_cycles(
+                                        1.0,
+                                        &mut ram,
+                                        &mut regs,
+                                        &mut stack,
+                                        &mut screen,
+                                        &mut keyboard,
+                                        &mut draw_flag,
+                                        1.0,
+                                    ) {
+                                        Ok(()) => (),
+                                        Err(e) => {
+                                            println!("{:?}", e);
+                                            return;
+                                        }
+                                    }
+                                };
+                            }
+                            _ => (),
+                        }
+                    }
                 }
                 _ => (),
             }
@@ -411,6 +465,7 @@ fn emulate_cycles(
     screen: &mut Screen,
     keyboard: &mut Keyboard,
     draw_flag: &mut bool,
+    clock_speed: f64,
 ) -> Result<(), InvalidOpcode> {
     if keyboard.wait_press == None {
         if regs.delay != 0 {
@@ -419,7 +474,11 @@ fn emulate_cycles(
         if regs.sound != 0 {
             regs.sound -= 1;
         }
-        let num_inst = (dt * CLOCK_SPEED).round() as usize;
+        let mut num_inst = (dt * clock_speed).round() as usize;
+
+        if num_inst <= 1 {
+            num_inst = 1;
+        }
 
         for _ in 0..num_inst {
             if keyboard.wait_press == None {
@@ -452,6 +511,7 @@ fn execute(
     keyboard: &mut Keyboard,
     draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
+    println!("{:?}", opcode);
     match opcode {
         Opcode::NoArg(NoArg::ClearScreen) => {
             screen.0.iter_mut().for_each(|inner_array| {
@@ -612,8 +672,8 @@ fn execute(
         }
         Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
             regs.v_regs[FLAG_REG] = (0b10000000
-                & regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                ) >> 7 as u8;
+                & regs.v_regs[arg.x().to_usize().expect("Check usize")])
+                >> 7 as u8;
             regs.v_regs[arg.x().to_usize().expect("Check usize")] =
                 regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
             regs.pc.update();
@@ -694,7 +754,8 @@ fn execute(
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(arg)) => {
-            regs.v_regs[arg.x().to_usize().expect("Check usize")] = arg.get_byte() & rand::random::<u8>();
+            regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                arg.get_byte() & rand::random::<u8>();
             regs.pc.update();
             Ok(())
         }

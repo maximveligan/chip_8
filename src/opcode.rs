@@ -119,22 +119,40 @@ pub enum TwoArg {
 impl fmt::Debug for TwoArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TwoArg::SkipEqVxVy(nyb) => {write!(f, "SkipEqVxVy {:?} Opcode: 5xy0", nyb)},
-            TwoArg::VxEqVy(nyb) => {write!(f, "VxEqVy {:?} Opcode: 8xy0", nyb)},
-            TwoArg::VxOREqVy(nyb) => {write!(f, "VxOREqVy {:?} Opcode: 8xy1", nyb)},
-            TwoArg::VxANDEqVy(nyb) => {write!(f, "VxANDEqVy {:?} Opcode: 8xy2", nyb)},
-            TwoArg::VxXOREqVy(nyb) => {write!(f, "VxXOREqVy {:?} Opcode: 8xy3", nyb)},
-            TwoArg::VxPlusEqVySetF(nyb) => {write!(f, "VxPlusEqVySetF {:?} Opcode: 8xy4", nyb)},
-            TwoArg::VxSubEqVySetF(nyb) => {write!(f, "VxSubEqVySetF {:?} Opcode: 8xy5", nyb)},
-            TwoArg::ShiftVxR(nyb) => {write!(f, "ShiftVxR {:?} Opcode: 8xy6", nyb)},
-            TwoArg::VxEqVySubVxSetF(nyb) => {write!(f, "VxEqVySubVxSetF {:?} Opcode: 8xy7", nyb)},
-            TwoArg::ShiftVxL(nyb) => {write!(f, "ShiftVxL {:?} Opcode: 8xyE", nyb)},
-            TwoArg::SkipVxNEqVy(nyb) => {write!(f, "SkipVxNEqVy {:?} Opcode: 9xy0", nyb)},
+            TwoArg::SkipEqVxVy(nyb) => {
+                write!(f, "SkipEqVxVy {:?} Opcode: 5xy0", nyb)
+            }
+            TwoArg::VxEqVy(nyb) => write!(f, "VxEqVy {:?} Opcode: 8xy0", nyb),
+            TwoArg::VxOREqVy(nyb) => {
+                write!(f, "VxOREqVy {:?} Opcode: 8xy1", nyb)
+            }
+            TwoArg::VxANDEqVy(nyb) => {
+                write!(f, "VxANDEqVy {:?} Opcode: 8xy2", nyb)
+            }
+            TwoArg::VxXOREqVy(nyb) => {
+                write!(f, "VxXOREqVy {:?} Opcode: 8xy3", nyb)
+            }
+            TwoArg::VxPlusEqVySetF(nyb) => {
+                write!(f, "VxPlusEqVySetF {:?} Opcode: 8xy4", nyb)
+            }
+            TwoArg::VxSubEqVySetF(nyb) => {
+                write!(f, "VxSubEqVySetF {:?} Opcode: 8xy5", nyb)
+            }
+            TwoArg::ShiftVxR(nyb) => {
+                write!(f, "ShiftVxR {:?} Opcode: 8xy6", nyb)
+            }
+            TwoArg::VxEqVySubVxSetF(nyb) => {
+                write!(f, "VxEqVySubVxSetF {:?} Opcode: 8xy7", nyb)
+            }
+            TwoArg::ShiftVxL(nyb) => {
+                write!(f, "ShiftVxL {:?} Opcode: 8xyE", nyb)
+            }
+            TwoArg::SkipVxNEqVy(nyb) => {
+                write!(f, "SkipVxNEqVy {:?} Opcode: 9xy0", nyb)
+            }
         }
     }
 }
-
-
 
 #[derive(Clone)]
 pub enum ThreeArg {
@@ -151,25 +169,45 @@ pub enum ThreeArg {
     DrawVxVyNib(ThreeNybbles),    //Dxyn
 }
 
-
 impl fmt::Debug for ThreeArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ThreeArg::JumpToCodeRout(nyb) => {write!(f, "JumpToCodeRout {:?} Opcode: 0nnn", nyb)},
-            ThreeArg::JumpToAddr(nyb) => {write!(f, "JumpToAddr {:?} Opcode: 1nnn", nyb)},
-            ThreeArg::CallSubAt(nyb) => {write!(f, "CallSubAt {:?} Opcode: 2nnn", nyb)},
-            ThreeArg::SkipVxEqKK(nyb) => {write!(f, "SkipVxEqKK {:?} Opcode: 3xkk", nyb)},
-            ThreeArg::SkipVxNEqKK(nyb) => {write!(f, "SkipVxNEqKK {:?} Opcode: 4xkk", nyb)},
-            ThreeArg::SetVxKK(nyb) => {write!(f, "SetVxKK {:?} Opcode: 6xkk", nyb)},
-            ThreeArg::VxEqVxPlusKK(nyb) => {write!(f, "VxEqVxPlusKK {:?} Opcode: 7xkk", nyb)},
-            ThreeArg::SetIToNNN(nyb) => {write!(f, "SetIToNNN {:?} Opcode: Annn", nyb)},
-            ThreeArg::PCEqNNNPlusV0(nyb) => {write!(f, "PCEqNNNPlusV0 {:?} Opcode: Bnnn", nyb)},
-            ThreeArg::VxEqRandANDKK(nyb) => {write!(f, "VxEqRandANDKK {:?} Opcode: Cxkk", nyb)},
-            ThreeArg::DrawVxVyNib(nyb) => {write!(f, "DrawVxVyNib {:?} Opcode: Dxyn", nyb)},
+            ThreeArg::JumpToCodeRout(nyb) => {
+                write!(f, "JumpToCodeRout {:?} Opcode: 0nnn", nyb)
+            }
+            ThreeArg::JumpToAddr(nyb) => {
+                write!(f, "JumpToAddr {:?} Opcode: 1nnn", nyb)
+            }
+            ThreeArg::CallSubAt(nyb) => {
+                write!(f, "CallSubAt {:?} Opcode: 2nnn", nyb)
+            }
+            ThreeArg::SkipVxEqKK(nyb) => {
+                write!(f, "SkipVxEqKK {:?} Opcode: 3xkk", nyb)
+            }
+            ThreeArg::SkipVxNEqKK(nyb) => {
+                write!(f, "SkipVxNEqKK {:?} Opcode: 4xkk", nyb)
+            }
+            ThreeArg::SetVxKK(nyb) => {
+                write!(f, "SetVxKK {:?} Opcode: 6xkk", nyb)
+            }
+            ThreeArg::VxEqVxPlusKK(nyb) => {
+                write!(f, "VxEqVxPlusKK {:?} Opcode: 7xkk", nyb)
+            }
+            ThreeArg::SetIToNNN(nyb) => {
+                write!(f, "SetIToNNN {:?} Opcode: Annn", nyb)
+            }
+            ThreeArg::PCEqNNNPlusV0(nyb) => {
+                write!(f, "PCEqNNNPlusV0 {:?} Opcode: Bnnn", nyb)
+            }
+            ThreeArg::VxEqRandANDKK(nyb) => {
+                write!(f, "VxEqRandANDKK {:?} Opcode: Cxkk", nyb)
+            }
+            ThreeArg::DrawVxVyNib(nyb) => {
+                write!(f, "DrawVxVyNib {:?} Opcode: Dxyn", nyb)
+            }
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub enum InvalidOpcode {
@@ -179,7 +217,6 @@ pub enum InvalidOpcode {
     OutOfBoundsAddress(String, Opcode),
     NoSuchDigitSprite(String, Opcode),
     OutOfScreenBounds(String, Opcode),
-    UndefBehavior(String, Opcode),
 }
 
 impl Opcode {
