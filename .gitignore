@@ -5,3 +5,4 @@ Cargo.lock
 *.HTM
 .rustfmt.toml
 *ch8
+roms/**
