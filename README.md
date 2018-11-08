@@ -14,6 +14,7 @@ Run `cargo run <path_to_binary>` to launch the emulator.
 Here are the controls for the emulator:
 
 ### System controls
+```
 Number 1         => 1
 Number 2         => 2
 Number 3         => 3
@@ -30,10 +31,13 @@ Z                => A
 X                => 0
 C                => B
 V                => F
+```
 
 ### Emulator controls
+```
 [                => Decrease CPU frequency by 10 Hz (lowest is 1 Hz)
 ]                => Increase CPU frequency by 10 Hz
 P                => Pause emulation
 M (while paused) => Step by 1 cycle
 Esc              => Quit the emulator
+```
