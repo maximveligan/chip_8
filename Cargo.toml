@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Maxim <maximveligan@gmail.com>"]
 
 [dependencies]
-rand = "0.4"
-num = "0.1.40"
-piston_window = "0.70.0"
+rand = "*"
+num = "*"
+piston_window = "*"
+find_folder = "*"

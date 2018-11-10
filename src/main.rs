@@ -329,7 +329,6 @@ fn main() {
     let mut stack: Stack = Stack::new();
     let mut screen: Screen = Screen::new();
     let mut keyboard: Keyboard = Keyboard::new();
-    let mut draw_flag: bool = false;
     let mut clock_speed: f64 = 540.0;
     let mut pause: bool = false;
 
@@ -379,8 +378,6 @@ fn main() {
                     }
                 }
             });
-
-            draw_flag = false;
         }
 
         if let Some(up_args) = e.update_args() {
@@ -392,7 +389,6 @@ fn main() {
                     &mut stack,
                     &mut screen,
                     &mut keyboard,
-                    &mut draw_flag,
                     clock_speed,
                 ) {
                     Ok(_) => (),
@@ -429,7 +425,6 @@ fn main() {
                                         &mut stack,
                                         &mut screen,
                                         &mut keyboard,
-                                        &mut draw_flag,
                                         1.0,
                                     ) {
                                         Ok(()) => (),
@@ -464,7 +459,6 @@ fn emulate_cycles(
     stack: &mut Stack,
     screen: &mut Screen,
     keyboard: &mut Keyboard,
-    draw_flag: &mut bool,
     clock_speed: f64,
 ) -> Result<(), InvalidOpcode> {
     if keyboard.wait_press == None {
@@ -483,8 +477,7 @@ fn emulate_cycles(
         for _ in 0..num_inst {
             if keyboard.wait_press == None {
                 let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram))?;
-                match execute(op, ram, regs, stack, screen, keyboard, draw_flag)
-                {
+                match execute(op, ram, regs, stack, screen, keyboard) {
                     Ok(_) => (),
                     Err(err) => return Err(err),
                 };
@@ -509,7 +502,6 @@ fn execute(
     stack: &mut Stack,
     screen: &mut Screen,
     keyboard: &mut Keyboard,
-    draw_flag: &mut bool,
 ) -> Result<(), InvalidOpcode> {
     println!("{:?}", opcode);
     match opcode {
@@ -530,12 +522,12 @@ fn execute(
         },
 
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
-            skip_if_vx(arg, keyboard, &mut regs.pc);
+            skip_if_vx(arg, keyboard, &regs.v_regs, &mut regs.pc);
             regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
-            skip_if_not_vx(arg, keyboard, &mut regs.pc);
+            skip_if_not_vx(arg, keyboard, &regs.v_regs, &mut regs.pc);
             regs.pc.update();
             Ok(())
         }
@@ -769,7 +761,6 @@ fn execute(
                 ram,
             ) {
             Ok(_) => {
-                *draw_flag = true;
                 regs.pc.update();
                 Ok(())
             }
@@ -805,8 +796,15 @@ fn skip_vx_neq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter) {
     }
 }
 
-fn skip_if_vx(byte_arg: Nybble, keyboard: &Keyboard, pc: &mut ProgramCounter) {
-    if keyboard.key_buffer[byte_arg.to_usize().expect("Check usize")] {
+fn skip_if_vx(
+    byte_arg: Nybble,
+    keyboard: &Keyboard,
+    v_regs: &[u8; 16],
+    pc: &mut ProgramCounter,
+) {
+    if keyboard.key_buffer
+        [v_regs[byte_arg.to_usize().expect("Check usize")] as usize]
+    {
         pc.update();
     }
 }
@@ -814,9 +812,12 @@ fn skip_if_vx(byte_arg: Nybble, keyboard: &Keyboard, pc: &mut ProgramCounter) {
 fn skip_if_not_vx(
     byte_arg: Nybble,
     keyboard: &Keyboard,
+    v_regs: &[u8; 16],
     pc: &mut ProgramCounter,
 ) {
-    if !keyboard.key_buffer[byte_arg.to_usize().expect("Check usize")] {
+    if !keyboard.key_buffer
+        [v_regs[byte_arg.to_usize().expect("Check usize")] as usize]
+    {
         pc.update();
     }
 }
