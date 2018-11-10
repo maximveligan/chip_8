@@ -10,7 +10,7 @@ Chip 8 is a very simple system and is a good entrypoint to learning about emulat
 I wrote this emulator to learn more about underlying CPU architecture and to learn more about how one would go about designing and writing an emulator.
 
 ## Usage
-Run `cargo run <path_to_binary>` to launch the emulator.
+To build from source, install the rust compiler and cargo on your system. Then run: `cargo run <path_to_binary>` to launch the emulator.
 
 ## Controls
 Here are the controls for the emulator:
