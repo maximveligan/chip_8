@@ -1,6 +1,8 @@
 ## Summary
 This is a Chip 8 emulator written in rust using piston for input and graphics.
 
+![Image of Yaktocat](./invaders.png)
+
 ## Why Chip 8?
 Chip 8 is a very simple system and is a good entrypoint to learning about emulator design.
 
