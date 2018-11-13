@@ -40,12 +40,23 @@ const PC_EQ_V0_PLUS_NNN: u16 = 0xB000;
 const VX_EQ_RAND_PLUS_KK: u16 = 0xC000;
 const DRAW_VX_VY_NIB: u16 = 0xD000;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Opcode {
     NoArg(NoArg),
     OneArg(OneArg),
     TwoArg(TwoArg),
     ThreeArg(ThreeArg),
+}
+
+impl fmt::Debug for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Opcode::NoArg(arg) => write!(f, "{:?}", arg),
+            Opcode::OneArg(arg) => write!(f, "{:?}", arg),
+            Opcode::TwoArg(arg) => write!(f, "{:?}", arg),
+            Opcode::ThreeArg(arg) => write!(f, "{:?}", arg),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,31 +83,17 @@ pub enum OneArg {
 impl fmt::Debug for OneArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OneArg::SkipIfVx(nyb) => {
-                write!(f, "SkipIfVx {:?} Opcode: Ex9E", nyb)
-            }
-            OneArg::SkipIfNVx(nyb) => {
-                write!(f, "SkipIfNVx {:?} Opcode: ExA1", nyb)
-            }
-            OneArg::SetVxDT(nyb) => write!(f, "SetVxDT {:?} Opcode: Fx07", nyb),
-            OneArg::WaitForKey(nyb) => {
-                write!(f, "WaitForKey {:?} Opcode: Fx0A", nyb)
-            }
-            OneArg::SetDT(nyb) => write!(f, "SetDT {:?} Opcode: Fx15", nyb),
-            OneArg::SetST(nyb) => write!(f, "SetST {:?} Opcode: Fx18", nyb),
-            OneArg::SetI(nyb) => write!(f, "SetI {:?} Opcode: Fx1E", nyb),
-            OneArg::SetSpriteI(nyb) => {
-                write!(f, "SetSpriteI {:?} Opcode: Fx29", nyb)
-            }
-            OneArg::StoreDecVx(nyb) => {
-                write!(f, "StoreDecVx {:?} Opcode: Fx33", nyb)
-            }
-            OneArg::StoreV0Vx(nyb) => {
-                write!(f, "StoreV0Vx {:?} Opcode: Fx55", nyb)
-            }
-            OneArg::ReadV0Vx(nyb) => {
-                write!(f, "ReadV0Vx {:?} Opcode: Fx65", nyb)
-            }
+            OneArg::SkipIfVx(nyb) => write!(f, "Op Ex9E SkipIfVx {:?}", nyb),
+            OneArg::SkipIfNVx(nyb) => write!(f, "Op ExA1 SkipIfNVx {:?}", nyb),
+            OneArg::SetVxDT(nyb) => write!(f, "Op Fx07 SetVxDT {:?}", nyb),
+            OneArg::WaitForKey(nyb) => write!(f, "Op Fx0A WaitForKey {:?}", nyb),
+            OneArg::SetDT(nyb) => write!(f, "Op Fx15 SetDT {:?}", nyb),
+            OneArg::SetST(nyb) => write!(f, "Op Fx18 SetST {:?}", nyb),
+            OneArg::SetI(nyb) => write!(f, "Op Fx1E SetI {:?}", nyb),
+            OneArg::SetSpriteI(nyb) => write!(f, "Op Fx29 SetSpriteI {:?}", nyb),
+            OneArg::StoreDecVx(nyb) => write!(f, "Op Fx33 StoreDecVx {:?}", nyb),
+            OneArg::StoreV0Vx(nyb) => write!(f, "Op Fx55 StoreV0Vx {:?}", nyb),
+            OneArg::ReadV0Vx(nyb) => write!(f, "Op Fx65 ReadV0Vx {:?}", nyb),
         }
     }
 }
@@ -119,37 +116,17 @@ pub enum TwoArg {
 impl fmt::Debug for TwoArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TwoArg::SkipEqVxVy(nyb) => {
-                write!(f, "SkipEqVxVy {:?} Opcode: 5xy0", nyb)
-            }
-            TwoArg::VxEqVy(nyb) => write!(f, "VxEqVy {:?} Opcode: 8xy0", nyb),
-            TwoArg::VxOREqVy(nyb) => {
-                write!(f, "VxOREqVy {:?} Opcode: 8xy1", nyb)
-            }
-            TwoArg::VxANDEqVy(nyb) => {
-                write!(f, "VxANDEqVy {:?} Opcode: 8xy2", nyb)
-            }
-            TwoArg::VxXOREqVy(nyb) => {
-                write!(f, "VxXOREqVy {:?} Opcode: 8xy3", nyb)
-            }
-            TwoArg::VxPlusEqVySetF(nyb) => {
-                write!(f, "VxPlusEqVySetF {:?} Opcode: 8xy4", nyb)
-            }
-            TwoArg::VxSubEqVySetF(nyb) => {
-                write!(f, "VxSubEqVySetF {:?} Opcode: 8xy5", nyb)
-            }
-            TwoArg::ShiftVxR(nyb) => {
-                write!(f, "ShiftVxR {:?} Opcode: 8xy6", nyb)
-            }
-            TwoArg::VxEqVySubVxSetF(nyb) => {
-                write!(f, "VxEqVySubVxSetF {:?} Opcode: 8xy7", nyb)
-            }
-            TwoArg::ShiftVxL(nyb) => {
-                write!(f, "ShiftVxL {:?} Opcode: 8xyE", nyb)
-            }
-            TwoArg::SkipVxNEqVy(nyb) => {
-                write!(f, "SkipVxNEqVy {:?} Opcode: 9xy0", nyb)
-            }
+            TwoArg::SkipEqVxVy(nyb) => write!(f, "Op 5xy0 SkipEqVxVy {:?}", nyb),
+            TwoArg::VxEqVy(nyb) => write!(f, "Op 8xy0 VxEqVy {:?}", nyb),
+            TwoArg::VxOREqVy(nyb) => write!(f, "Op 8xy1 VxOREqVy {:?}", nyb),
+            TwoArg::VxANDEqVy(nyb) => write!(f, "Op 8xy2 VxANDEqVy {:?}", nyb),
+            TwoArg::VxXOREqVy(nyb) => write!(f, "Op 8xy3 VxXOREqVy {:?}", nyb),
+            TwoArg::VxPlusEqVySetF(nyb) => write!(f, "Op 8xy4 VxPlusEqVySetF {:?}", nyb),
+            TwoArg::VxSubEqVySetF(nyb) => write!(f, "Op 8xy5 VxSubEqVySetF {:?}", nyb),
+            TwoArg::ShiftVxR(nyb) => write!(f, "Op 8xy6 ShiftVxR {:?}", nyb),
+            TwoArg::VxEqVySubVxSetF(nyb) => write!(f, "Op 8xy7 VxEqVySubVxSetF {:?}", nyb),
+            TwoArg::ShiftVxL(nyb) => write!(f, "Op 8xyE ShiftVxL {:?}", nyb),
+            TwoArg::SkipVxNEqVy(nyb) => write!(f, "Op 9xy0 SkipVxNEqVy {:?}", nyb),
         }
     }
 }
@@ -172,39 +149,17 @@ pub enum ThreeArg {
 impl fmt::Debug for ThreeArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ThreeArg::JumpToCodeRout(nyb) => {
-                write!(f, "JumpToCodeRout {:?} Opcode: 0nnn", nyb)
-            }
-            ThreeArg::JumpToAddr(nyb) => {
-                write!(f, "JumpToAddr {:?} Opcode: 1nnn", nyb)
-            }
-            ThreeArg::CallSubAt(nyb) => {
-                write!(f, "CallSubAt {:?} Opcode: 2nnn", nyb)
-            }
-            ThreeArg::SkipVxEqKK(nyb) => {
-                write!(f, "SkipVxEqKK {:?} Opcode: 3xkk", nyb)
-            }
-            ThreeArg::SkipVxNEqKK(nyb) => {
-                write!(f, "SkipVxNEqKK {:?} Opcode: 4xkk", nyb)
-            }
-            ThreeArg::SetVxKK(nyb) => {
-                write!(f, "SetVxKK {:?} Opcode: 6xkk", nyb)
-            }
-            ThreeArg::VxEqVxPlusKK(nyb) => {
-                write!(f, "VxEqVxPlusKK {:?} Opcode: 7xkk", nyb)
-            }
-            ThreeArg::SetIToNNN(nyb) => {
-                write!(f, "SetIToNNN {:?} Opcode: Annn", nyb)
-            }
-            ThreeArg::PCEqNNNPlusV0(nyb) => {
-                write!(f, "PCEqNNNPlusV0 {:?} Opcode: Bnnn", nyb)
-            }
-            ThreeArg::VxEqRandANDKK(nyb) => {
-                write!(f, "VxEqRandANDKK {:?} Opcode: Cxkk", nyb)
-            }
-            ThreeArg::DrawVxVyNib(nyb) => {
-                write!(f, "DrawVxVyNib {:?} Opcode: Dxyn", nyb)
-            }
+            ThreeArg::JumpToCodeRout(nyb) => write!(f, "Op 0nnn JumpToCodeRout {:?}", nyb),
+            ThreeArg::JumpToAddr(nyb) => write!(f, "Op 1nnn JumpToAddr {:?}", nyb),
+            ThreeArg::CallSubAt(nyb) => write!(f, "Op 2nnn CallSubAt {:?}", nyb),
+            ThreeArg::SkipVxEqKK(nyb) => write!(f, "Op 3xkk SkipVxEqKK {:?}", nyb),
+            ThreeArg::SkipVxNEqKK(nyb) => write!(f, "Op 4xkk SkipVxNEqKK {:?}", nyb),
+            ThreeArg::SetVxKK(nyb) => write!(f, "Op 6xkk SetVxKK {:?}", nyb),
+            ThreeArg::VxEqVxPlusKK(nyb) => write!(f, "Op 7xkk VxEqVxPlusKK {:?}", nyb),
+            ThreeArg::SetIToNNN(nyb) => write!(f, "Op Annn SetIToNNN {:?}", nyb),
+            ThreeArg::PCEqNNNPlusV0(nyb) => write!(f, "Op Bnnn PCEqNNNPlusV0 {:?}", nyb),
+            ThreeArg::VxEqRandANDKK(nyb) => write!(f, "Op Cxkk VxEqRandANDKK {:?}", nyb),
+            ThreeArg::DrawVxVyNib(nyb) => write!(f, "Op Dxyn DrawVxVyNib {:?}", nyb),
         }
     }
 }
@@ -236,15 +191,9 @@ impl Opcode {
             op if ((op & SET_SPR_I) == SET_SPR_I) => {
                 Ok(Opcode::OneArg(OneArg::SetSpriteI(Nybble::from(op))))
             }
-            op if ((op & SET_I) == SET_I) => {
-                Ok(Opcode::OneArg(OneArg::SetI(Nybble::from(op))))
-            }
-            op if ((op & SET_ST) == SET_ST) => {
-                Ok(Opcode::OneArg(OneArg::SetST(Nybble::from(op))))
-            }
-            op if ((op & SET_DT) == SET_DT) => {
-                Ok(Opcode::OneArg(OneArg::SetDT(Nybble::from(op))))
-            }
+            op if ((op & SET_I) == SET_I) => Ok(Opcode::OneArg(OneArg::SetI(Nybble::from(op)))),
+            op if ((op & SET_ST) == SET_ST) => Ok(Opcode::OneArg(OneArg::SetST(Nybble::from(op)))),
+            op if ((op & SET_DT) == SET_DT) => Ok(Opcode::OneArg(OneArg::SetDT(Nybble::from(op)))),
             op if ((op & WAIT_FOR_KEY) == WAIT_FOR_KEY) => {
                 Ok(Opcode::OneArg(OneArg::WaitForKey(Nybble::from(op))))
             }
@@ -257,31 +206,27 @@ impl Opcode {
             op if ((op & SKIP_IF_VX) == SKIP_IF_VX) => {
                 Ok(Opcode::OneArg(OneArg::SkipIfVx(Nybble::from(op))))
             }
-            op if ((op & DRAW_VX_VY_NIB) == DRAW_VX_VY_NIB) => Ok(
-                Opcode::ThreeArg(ThreeArg::DrawVxVyNib(ThreeNybbles::from(op))),
-            ),
-            op if ((op & VX_EQ_RAND_PLUS_KK) == VX_EQ_RAND_PLUS_KK) => {
-                Ok(Opcode::ThreeArg(ThreeArg::VxEqRandANDKK(
-                    ThreeNybbles::from(op),
-                )))
-            }
-            op if ((op & PC_EQ_V0_PLUS_NNN) == PC_EQ_V0_PLUS_NNN) => {
-                Ok(Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(
-                    ThreeNybbles::from(op),
-                )))
-            }
-            op if ((op & I_EQ_NNN) == I_EQ_NNN) => Ok(Opcode::ThreeArg(
-                ThreeArg::SetIToNNN(ThreeNybbles::from(op)),
+            op if ((op & DRAW_VX_VY_NIB) == DRAW_VX_VY_NIB) => Ok(Opcode::ThreeArg(
+                ThreeArg::DrawVxVyNib(ThreeNybbles::from(op)),
             )),
+            op if ((op & VX_EQ_RAND_PLUS_KK) == VX_EQ_RAND_PLUS_KK) => Ok(Opcode::ThreeArg(
+                ThreeArg::VxEqRandANDKK(ThreeNybbles::from(op)),
+            )),
+            op if ((op & PC_EQ_V0_PLUS_NNN) == PC_EQ_V0_PLUS_NNN) => Ok(Opcode::ThreeArg(
+                ThreeArg::PCEqNNNPlusV0(ThreeNybbles::from(op)),
+            )),
+            op if ((op & I_EQ_NNN) == I_EQ_NNN) => Ok(Opcode::ThreeArg(ThreeArg::SetIToNNN(
+                ThreeNybbles::from(op),
+            ))),
             op if ((op & SKIP_VX_NOT_VY) == SKIP_VX_NOT_VY) => {
                 Ok(Opcode::TwoArg(TwoArg::SkipVxNEqVy(TwoNybbles::from(op))))
             }
             op if ((op & SHIFT_VX_L) == SHIFT_VX_L) => {
                 Ok(Opcode::TwoArg(TwoArg::ShiftVxL(TwoNybbles::from(op))))
             }
-            op if ((op & VX_EQ_VY_SUB_VX_F) == VX_EQ_VY_SUB_VX_F) => Ok(
-                Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(TwoNybbles::from(op))),
-            ),
+            op if ((op & VX_EQ_VY_SUB_VX_F) == VX_EQ_VY_SUB_VX_F) => Ok(Opcode::TwoArg(
+                TwoArg::VxEqVySubVxSetF(TwoNybbles::from(op)),
+            )),
             op if ((op & SHIFT_VX_R) == SHIFT_VX_R) => {
                 Ok(Opcode::TwoArg(TwoArg::ShiftVxR(TwoNybbles::from(op))))
             }
@@ -303,38 +248,31 @@ impl Opcode {
             op if ((op & VX_EQ_VY) == VX_EQ_VY) => {
                 Ok(Opcode::TwoArg(TwoArg::VxEqVy(TwoNybbles::from(op))))
             }
-            op if ((op & VX_PLUS_EQ_KK) == VX_PLUS_EQ_KK) => {
-                Ok(Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(
-                    ThreeNybbles::from(op),
-                )))
-            }
+            op if ((op & VX_PLUS_EQ_KK) == VX_PLUS_EQ_KK) => Ok(Opcode::ThreeArg(
+                ThreeArg::VxEqVxPlusKK(ThreeNybbles::from(op)),
+            )),
             op if ((op & VX_EQ_KK) == VX_EQ_KK) => {
                 Ok(Opcode::ThreeArg(ThreeArg::SetVxKK(ThreeNybbles::from(op))))
             }
             op if ((op & SKIP_VX_EQ_VY) == SKIP_VX_EQ_VY) => {
                 Ok(Opcode::TwoArg(TwoArg::SkipEqVxVy(TwoNybbles::from(op))))
             }
-            op if ((op & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Ok(
-                Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(ThreeNybbles::from(op))),
-            ),
-            op if ((op & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Ok(
-                Opcode::ThreeArg(ThreeArg::SkipVxEqKK(ThreeNybbles::from(op))),
-            ),
-            op if ((op & CALL_SUB_AT_ADDR) == CALL_SUB_AT_ADDR) => Ok(
-                Opcode::ThreeArg(ThreeArg::CallSubAt(ThreeNybbles::from(op))),
-            ),
-            op if ((op & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Ok(
-                Opcode::ThreeArg(ThreeArg::JumpToAddr(ThreeNybbles::from(op))),
-            ),
-            op if ((op & JUMP_TO_CODEROUTE) == JUMP_TO_CODEROUTE) => {
-                Ok(Opcode::ThreeArg(ThreeArg::JumpToCodeRout(
-                    ThreeNybbles::from(op),
-                )))
-            }
-            _ => Err(InvalidOpcode::DoesntExist(
-                "Unsupported op".to_string(),
-                op,
+            op if ((op & SKIP_VX_NEQ_KK) == SKIP_VX_NEQ_KK) => Ok(Opcode::ThreeArg(
+                ThreeArg::SkipVxNEqKK(ThreeNybbles::from(op)),
             )),
+            op if ((op & SKIP_VX_EQ_KK) == SKIP_VX_EQ_KK) => Ok(Opcode::ThreeArg(
+                ThreeArg::SkipVxEqKK(ThreeNybbles::from(op)),
+            )),
+            op if ((op & CALL_SUB_AT_ADDR) == CALL_SUB_AT_ADDR) => Ok(Opcode::ThreeArg(
+                ThreeArg::CallSubAt(ThreeNybbles::from(op)),
+            )),
+            op if ((op & JUMP_TO_ADDR) == JUMP_TO_ADDR) => Ok(Opcode::ThreeArg(
+                ThreeArg::JumpToAddr(ThreeNybbles::from(op)),
+            )),
+            op if ((op & JUMP_TO_CODEROUTE) == JUMP_TO_CODEROUTE) => Ok(Opcode::ThreeArg(
+                ThreeArg::JumpToCodeRout(ThreeNybbles::from(op)),
+            )),
+            _ => Err(InvalidOpcode::DoesntExist("Unsupported op".to_string(), op)),
         }
     }
 }

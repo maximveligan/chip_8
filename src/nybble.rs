@@ -22,7 +22,7 @@ impl From<u16> for Nybble {
 
 impl fmt::Debug for Nybble {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Nybble hex: {:X} dec: {}", self.0[0], self.0[0])
+        write!(f, "{:#03x}", self.0[0])
     }
 }
 
@@ -62,7 +62,7 @@ impl From<u16> for TwoNybbles {
 
 impl fmt::Debug for TwoNybbles {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "TwoNybble hex: {:X} dec: {}", self.0[0], self.0[0])
+        write!(f, "{:#04x}", self.0[0])
     }
 }
 
@@ -107,6 +107,6 @@ impl From<u16> for ThreeNybbles {
 impl fmt::Debug for ThreeNybbles {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let comb_nyb = ((self.0[0] as u16) << 8) | (self.0[1] as u16);
-        write!(f, "ThreeNybble hex: {:X} dec: {}", comb_nyb, comb_nyb)
+        write!(f, "{:#05x}", comb_nyb)
     }
 }
