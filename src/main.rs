@@ -522,12 +522,20 @@ fn execute(
         },
 
         Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
-            skip_if_vx(arg, keyboard, &regs.v_regs, &mut regs.pc);
+            if keyboard.key_buffer
+                [regs.v_regs[arg.to_usize().expect("Check usize")] as usize]
+            {
+                regs.pc.update();
+            }
             regs.pc.update();
             Ok(())
         }
         Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
-            skip_if_not_vx(arg, keyboard, &regs.v_regs, &mut regs.pc);
+            if !keyboard.key_buffer
+                [regs.v_regs[arg.to_usize().expect("Check usize")] as usize]
+            {
+                regs.pc.update();
+            }
             regs.pc.update();
             Ok(())
         }
@@ -588,11 +596,12 @@ fn execute(
             Ok(())
         }
         Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => {
-            skip_vx_eq_vy(
-                regs.v_regs[arg.x().to_usize().expect("Check usize")],
-                regs.v_regs[arg.y().to_usize().expect("Check usize")],
-                &mut regs.pc,
-            );
+            if regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                == regs.v_regs[arg.y().to_usize().expect("Check usize")]
+            {
+                regs.pc.update();
+            }
+
             regs.pc.update();
             Ok(())
         }
@@ -672,11 +681,12 @@ fn execute(
             Ok(())
         }
         Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
-            skip_vx_neq_vy(
-                regs.v_regs[arg.x().to_usize().expect("Check usize")],
-                regs.v_regs[arg.y().to_usize().expect("Check usize")],
-                &mut regs.pc,
-            );
+            if regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                != regs.v_regs[arg.y().to_usize().expect("Check usize")]
+            {
+                regs.pc.update();
+            }
+
             regs.pc.update();
             Ok(())
         }
@@ -698,20 +708,22 @@ fn execute(
             }
         }
         Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
-            skip_vx_eq_kk(
-                regs.v_regs[arg.x().to_usize().expect("Check usize")],
-                arg.get_byte(),
-                &mut regs.pc,
-            );
+            if regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                == arg.get_byte()
+            {
+                regs.pc.update();
+            }
+
             regs.pc.update();
             Ok(())
         }
         Opcode::ThreeArg(ThreeArg::SkipVxNEqKK(arg)) => {
-            skip_vx_neq_kk(
-                regs.v_regs[arg.x().to_usize().expect("Check usize")],
-                arg.get_byte(),
-                &mut regs.pc,
-            );
+            if regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                != arg.get_byte()
+            {
+                regs.pc.update();
+            }
+
             regs.pc.update();
             Ok(())
         }
@@ -766,59 +778,6 @@ fn execute(
             }
             Err(err) => Err(InvalidOpcode::OutOfScreenBounds(err, opcode)),
         },
-    }
-}
-
-fn skip_vx_eq_kk(v_x: u8, byte: u8, pc: &mut ProgramCounter) {
-    if v_x == byte {
-        pc.update();
-    }
-}
-
-fn skip_vx_neq_kk(v_x: u8, byte: u8, pc: &mut ProgramCounter) {
-    if v_x != byte {
-        pc.update();
-    }
-}
-
-fn skip_vx_eq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter) {
-    if v_y == v_x {
-        pc.update();
-    }
-}
-
-// Note: Instructioins 8xyE and 8xy6 change depending on the interpreter.
-// Double check for odd  emulator behaviour
-
-fn skip_vx_neq_vy(v_x: u8, v_y: u8, pc: &mut ProgramCounter) {
-    if v_x != v_y {
-        pc.update();
-    }
-}
-
-fn skip_if_vx(
-    byte_arg: Nybble,
-    keyboard: &Keyboard,
-    v_regs: &[u8; 16],
-    pc: &mut ProgramCounter,
-) {
-    if keyboard.key_buffer
-        [v_regs[byte_arg.to_usize().expect("Check usize")] as usize]
-    {
-        pc.update();
-    }
-}
-
-fn skip_if_not_vx(
-    byte_arg: Nybble,
-    keyboard: &Keyboard,
-    v_regs: &[u8; 16],
-    pc: &mut ProgramCounter,
-) {
-    if !keyboard.key_buffer
-        [v_regs[byte_arg.to_usize().expect("Check usize")] as usize]
-    {
-        pc.update();
     }
 }
 
@@ -880,74 +839,4 @@ fn get_bit(n: u8, b: u8) -> Result<bool, String> {
         return Err(format!("Attempted to pass in a val greater than 7 {}", b));
     }
     Ok((n >> (7 - b)) & 1 == 1)
-}
-
-#[test]
-fn test_fetch_opcode() {
-    let mut ram: Ram = Ram::new();
-    let mut regs: Registers = Registers::new();
-    regs.pc.set_addr(0);
-    ram.0[0] = 0xFF;
-    ram.0[1] = 0xA2;
-    assert_eq!(fetch_opcode(&regs.pc, &ram), 0xFFA2);
-}
-
-#[test]
-fn test_to_addr() {
-    assert_eq!(0x0FBA, ThreeNybbles::new([0x0F, 0xBA]).to_addr())
-}
-
-#[test]
-#[should_panic]
-fn test_nybble() {
-    let nybble: Nybble = Nybble::new([0xFA]);
-}
-
-#[test]
-#[should_panic]
-fn test_triple_nybble() {
-    let tnybble: ThreeNybbles = ThreeNybbles::new([0xFA, 0xFD]);
-}
-
-#[test]
-#[should_panic]
-fn test_decode_op() {
-    let chip8_addr: u16 = 0x200;
-    let amount_of_ops: u16 = 35;
-    let mut ram: Ram = Ram::new();
-    let mut regs: Registers = Registers::new();
-    let test_ops: [u8; 70] = [
-        0x05, 0x55, 0x00, 0xE0, 0x00, 0xEE, 0x15, 0x55, 0x25, 0x55, 0x31, 0x33,
-        0x41, 0x33, 0x56, 0x70, 0x61, 0x33, 0x71, 0x33, 0x86, 0x70, 0x86, 0x71,
-        0x86, 0x72, 0x86, 0x73, 0x86, 0x74, 0x86, 0x75, 0x86, 0x76, 0x86, 0x77,
-        0x86, 0x7E, 0x96, 0x70, 0xA5, 0x55, 0xB5, 0x55, 0xC1, 0x33, 0xD6, 0x75,
-        0xE1, 0x9E, 0xE1, 0xA1, 0xF1, 0x07, 0xF1, 0x0A, 0xF1, 0x15, 0xF1, 0x18,
-        0xF1, 0x1E, 0xF1, 0x29, 0xF1, 0x33, 0xF1, 0x55, 0xF1, 0x65,
-    ];
-    let mut x = chip8_addr;
-    for element in test_ops.iter() {
-        ram.0[x as usize] = *element;
-        x += 1;
-    }
-    loop {
-        let op = Opcode::decode_op(fetch_opcode(&regs.pc, &ram));
-        regs.pc.update();
-        if (regs.pc.get_addr() == (chip8_addr + (amount_of_ops * 2))) {
-            break;
-        }
-    }
-}
-
-#[test]
-fn test_rom_loader() {
-    panic!();
-}
-
-#[test]
-#[should_panic]
-fn test_wrong_rom_path() {}
-
-#[test]
-fn test_rom_ram_loader() {
-    panic!();
 }
