@@ -59,10 +59,19 @@ impl fmt::Debug for Opcode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum NoArg {
     ClearScreen, //00E0
     ReturnSubrt, //00EE
+}
+
+impl fmt::Debug for NoArg {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NoArg::ClearScreen => write!(f, "00E0       ClearScreen"),
+            NoArg::ReturnSubrt => write!(f, "00EE       ReturnSubrt"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -83,17 +92,17 @@ pub enum OneArg {
 impl fmt::Debug for OneArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OneArg::SkipIfVx(nyb) => write!(f, "Op Ex9E SkipIfVx {:?}", nyb),
-            OneArg::SkipIfNVx(nyb) => write!(f, "Op ExA1 SkipIfNVx {:?}", nyb),
-            OneArg::SetVxDT(nyb) => write!(f, "Op Fx07 SetVxDT {:?}", nyb),
-            OneArg::WaitForKey(nyb) => write!(f, "Op Fx0A WaitForKey {:?}", nyb),
-            OneArg::SetDT(nyb) => write!(f, "Op Fx15 SetDT {:?}", nyb),
-            OneArg::SetST(nyb) => write!(f, "Op Fx18 SetST {:?}", nyb),
-            OneArg::SetI(nyb) => write!(f, "Op Fx1E SetI {:?}", nyb),
-            OneArg::SetSpriteI(nyb) => write!(f, "Op Fx29 SetSpriteI {:?}", nyb),
-            OneArg::StoreDecVx(nyb) => write!(f, "Op Fx33 StoreDecVx {:?}", nyb),
-            OneArg::StoreV0Vx(nyb) => write!(f, "Op Fx55 StoreV0Vx {:?}", nyb),
-            OneArg::ReadV0Vx(nyb) => write!(f, "Op Fx65 ReadV0Vx {:?}", nyb),
+            OneArg::SkipIfVx(nyb) => write!(f, "Ex9E {:?}   SkipIfVx", nyb),
+            OneArg::SkipIfNVx(nyb) => write!(f, "ExA1 {:?}   SkipIfNVx", nyb),
+            OneArg::SetVxDT(nyb) => write!(f, "Fx07 {:?}   SetVxDT", nyb),
+            OneArg::WaitForKey(nyb) => write!(f, "Fx0A {:?}   WaitForKey", nyb),
+            OneArg::SetDT(nyb) => write!(f, "Fx15 {:?}   SetDT", nyb),
+            OneArg::SetST(nyb) => write!(f, "Fx18 {:?}   SetST", nyb),
+            OneArg::SetI(nyb) => write!(f, "Fx1E {:?}   SetI", nyb),
+            OneArg::SetSpriteI(nyb) => write!(f, "Fx29 {:?}   SetSpriteI", nyb),
+            OneArg::StoreDecVx(nyb) => write!(f, "Fx33 {:?}   StoreDecVx", nyb),
+            OneArg::StoreV0Vx(nyb) => write!(f, "Fx55 {:?}   StoreV0Vx", nyb),
+            OneArg::ReadV0Vx(nyb) => write!(f, "Fx65 {:?}   ReadV0Vx", nyb),
         }
     }
 }
@@ -116,17 +125,17 @@ pub enum TwoArg {
 impl fmt::Debug for TwoArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TwoArg::SkipEqVxVy(nyb) => write!(f, "Op 5xy0 SkipEqVxVy {:?}", nyb),
-            TwoArg::VxEqVy(nyb) => write!(f, "Op 8xy0 VxEqVy {:?}", nyb),
-            TwoArg::VxOREqVy(nyb) => write!(f, "Op 8xy1 VxOREqVy {:?}", nyb),
-            TwoArg::VxANDEqVy(nyb) => write!(f, "Op 8xy2 VxANDEqVy {:?}", nyb),
-            TwoArg::VxXOREqVy(nyb) => write!(f, "Op 8xy3 VxXOREqVy {:?}", nyb),
-            TwoArg::VxPlusEqVySetF(nyb) => write!(f, "Op 8xy4 VxPlusEqVySetF {:?}", nyb),
-            TwoArg::VxSubEqVySetF(nyb) => write!(f, "Op 8xy5 VxSubEqVySetF {:?}", nyb),
-            TwoArg::ShiftVxR(nyb) => write!(f, "Op 8xy6 ShiftVxR {:?}", nyb),
-            TwoArg::VxEqVySubVxSetF(nyb) => write!(f, "Op 8xy7 VxEqVySubVxSetF {:?}", nyb),
-            TwoArg::ShiftVxL(nyb) => write!(f, "Op 8xyE ShiftVxL {:?}", nyb),
-            TwoArg::SkipVxNEqVy(nyb) => write!(f, "Op 9xy0 SkipVxNEqVy {:?}", nyb),
+            TwoArg::SkipEqVxVy(nyb) => write!(f, "5xy0 {:?}  SkipEqVxVy", nyb),
+            TwoArg::VxEqVy(nyb) => write!(f, "8xy0 {:?}  VxEqVy", nyb),
+            TwoArg::VxOREqVy(nyb) => write!(f, "8xy1 {:?}  VxOREqVy", nyb),
+            TwoArg::VxANDEqVy(nyb) => write!(f, "8xy2 {:?}  VxANDEqVy", nyb),
+            TwoArg::VxXOREqVy(nyb) => write!(f, "8xy3 {:?}  VxXOREqVy", nyb),
+            TwoArg::VxPlusEqVySetF(nyb) => write!(f, "8xy4 {:?}  VxPlusEqVySetF", nyb),
+            TwoArg::VxSubEqVySetF(nyb) => write!(f, "8xy5 {:?}  VxSubEqVySetF", nyb),
+            TwoArg::ShiftVxR(nyb) => write!(f, "8xy6 {:?}  ShiftVxR", nyb),
+            TwoArg::VxEqVySubVxSetF(nyb) => write!(f, "8xy7 {:?}  VxEqVySubVxSetF", nyb),
+            TwoArg::ShiftVxL(nyb) => write!(f, "8xyE {:?}  ShiftVxL", nyb),
+            TwoArg::SkipVxNEqVy(nyb) => write!(f, "9xy0 {:?}  SkipVxNEqVy", nyb),
         }
     }
 }
@@ -149,17 +158,17 @@ pub enum ThreeArg {
 impl fmt::Debug for ThreeArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ThreeArg::JumpToCodeRout(nyb) => write!(f, "Op 0nnn JumpToCodeRout {:?}", nyb),
-            ThreeArg::JumpToAddr(nyb) => write!(f, "Op 1nnn JumpToAddr {:?}", nyb),
-            ThreeArg::CallSubAt(nyb) => write!(f, "Op 2nnn CallSubAt {:?}", nyb),
-            ThreeArg::SkipVxEqKK(nyb) => write!(f, "Op 3xkk SkipVxEqKK {:?}", nyb),
-            ThreeArg::SkipVxNEqKK(nyb) => write!(f, "Op 4xkk SkipVxNEqKK {:?}", nyb),
-            ThreeArg::SetVxKK(nyb) => write!(f, "Op 6xkk SetVxKK {:?}", nyb),
-            ThreeArg::VxEqVxPlusKK(nyb) => write!(f, "Op 7xkk VxEqVxPlusKK {:?}", nyb),
-            ThreeArg::SetIToNNN(nyb) => write!(f, "Op Annn SetIToNNN {:?}", nyb),
-            ThreeArg::PCEqNNNPlusV0(nyb) => write!(f, "Op Bnnn PCEqNNNPlusV0 {:?}", nyb),
-            ThreeArg::VxEqRandANDKK(nyb) => write!(f, "Op Cxkk VxEqRandANDKK {:?}", nyb),
-            ThreeArg::DrawVxVyNib(nyb) => write!(f, "Op Dxyn DrawVxVyNib {:?}", nyb),
+            ThreeArg::JumpToCodeRout(nyb) => write!(f, "0nnn {:?} JumpToCodeRout", nyb),
+            ThreeArg::JumpToAddr(nyb) => write!(f, "1nnn {:?} JumpToAddr", nyb),
+            ThreeArg::CallSubAt(nyb) => write!(f, "2nnn {:?} CallSubAt", nyb),
+            ThreeArg::SkipVxEqKK(nyb) => write!(f, "3xkk {:?} SkipVxEqKK", nyb),
+            ThreeArg::SkipVxNEqKK(nyb) => write!(f, "4xkk {:?} SkipVxNEqKK", nyb),
+            ThreeArg::SetVxKK(nyb) => write!(f, "6xkk {:?} SetVxKK", nyb),
+            ThreeArg::VxEqVxPlusKK(nyb) => write!(f, "7xkk {:?} VxEqVxPlusKK", nyb),
+            ThreeArg::SetIToNNN(nyb) => write!(f, "Annn {:?} SetIToNNN", nyb),
+            ThreeArg::PCEqNNNPlusV0(nyb) => write!(f, "Bnnn {:?} PCEqNNNPlusV0", nyb),
+            ThreeArg::VxEqRandANDKK(nyb) => write!(f, "Cxkk {:?} VxEqRandANDKK", nyb),
+            ThreeArg::DrawVxVyNib(nyb) => write!(f, "Dxyn {:?} DrawVxVyNib", nyb),
         }
     }
 }
