@@ -289,14 +289,14 @@ pub struct Chip8 {
 impl Chip8 {
     pub fn new(rom_path: &str) -> Result<Chip8, String> {
         Ok(Chip8 {
-        ram: match Ram::initialize_ram(&rom_path) {
-            Ok(r) => r,
-            Err(e) => return Err(e),
-        },
-        regs: Registers::new(),
-        stack: Stack::new(),
-        screen: Screen::new(),
-        keyboard: Keyboard::new(),
+            ram: match Ram::initialize_ram(&rom_path) {
+                Ok(r) => r,
+                Err(e) => return Err(e),
+            },
+            regs: Registers::new(),
+            stack: Stack::new(),
+            screen: Screen::new(),
+            keyboard: Keyboard::new(),
         })
     }
 
@@ -316,18 +316,23 @@ impl Chip8 {
                 self.regs.pc.update();
                 Ok(())
             }
-            Opcode::NoArg(NoArg::ReturnSubrt) => match self.stack.pop(&mut self.regs.sp) {
-                Ok(pc) => {
-                    self.regs.pc = pc;
-                    self.regs.pc.update();
-                    Ok(())
+            Opcode::NoArg(NoArg::ReturnSubrt) => {
+                match self.stack.pop(&mut self.regs.sp) {
+                    Ok(pc) => {
+                        self.regs.pc = pc;
+                        self.regs.pc.update();
+                        Ok(())
+                    }
+                    Err(err) => Err(InvalidOpcode::StackUnderflow(err, opcode)),
                 }
-                Err(err) => Err(InvalidOpcode::StackUnderflow(err, opcode)),
-            },
+            }
 
             Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
-                if self.keyboard.key_buffer
-                    [self.regs.v_regs[arg.to_usize().expect("Check usize")] as usize]
+                if self.keyboard.key_buffer[self.regs.v_regs[arg
+                                                                 .to_usize()
+                                                                 .expect(
+                    "Check usize",
+                )] as usize]
                 {
                     self.regs.pc.update();
                 }
@@ -335,8 +340,11 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
-                if !self.keyboard.key_buffer
-                    [self.regs.v_regs[arg.to_usize().expect("Check usize")] as usize]
+                if !self.keyboard.key_buffer[self.regs.v_regs[arg
+                                                                  .to_usize()
+                                                                  .expect(
+                    "Check usize",
+                )] as usize]
                 {
                     self.regs.pc.update();
                 }
@@ -344,7 +352,8 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::OneArg(OneArg::SetVxDT(arg)) => {
-                self.regs.v_regs[arg.to_usize().expect("Check usize")] = self.regs.delay;
+                self.regs.v_regs[arg.to_usize().expect("Check usize")] =
+                    self.regs.delay;
                 self.regs.pc.update();
                 Ok(())
             }
@@ -354,18 +363,21 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::OneArg(OneArg::SetDT(arg)) => {
-                self.regs.delay = self.regs.v_regs[arg.to_usize().expect("Check usize")];
+                self.regs.delay =
+                    self.regs.v_regs[arg.to_usize().expect("Check usize")];
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::OneArg(OneArg::SetST(arg)) => {
-                self.regs.sound = self.regs.v_regs[arg.to_usize().expect("Check usize")];
+                self.regs.sound =
+                    self.regs.v_regs[arg.to_usize().expect("Check usize")];
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::OneArg(OneArg::SetI(arg)) => {
-                self.regs.i_reg +=
-                    (self.regs.v_regs[arg.to_usize().expect("Check usize")]) as u16;
+                self.regs.i_reg += (self.regs.v_regs
+                    [arg.to_usize().expect("Check usize")])
+                    as u16;
                 self.regs.pc.update();
 
                 Ok(())
@@ -381,7 +393,8 @@ impl Chip8 {
                 Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(err, opcode)),
             },
             Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
-                let tmp = self.regs.v_regs[arg.to_usize().expect("Check usize")];
+                let tmp =
+                    self.regs.v_regs[arg.to_usize().expect("Check usize")];
                 self.ram.0[self.regs.i_reg as usize] = tmp / 100;
                 self.ram.0[(self.regs.i_reg + 1) as usize] = (tmp % 100) / 10;
                 self.ram.0[(self.regs.i_reg + 2) as usize] = tmp % 10;
@@ -390,21 +403,24 @@ impl Chip8 {
             }
             Opcode::OneArg(OneArg::StoreV0Vx(arg)) => {
                 for index in 0..=arg.to_u64().expect("Check to_u64") {
-                    self.ram.0[(self.regs.i_reg + index as u16) as usize] = self.regs.v_regs[index as usize]
+                    self.ram.0[(self.regs.i_reg + index as u16) as usize] =
+                        self.regs.v_regs[index as usize]
                 }
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::OneArg(OneArg::ReadV0Vx(arg)) => {
                 for index in 0..=arg.to_usize().expect("Check usize") {
-                    self.regs.v_regs[index as usize] = self.ram.0[(self.regs.i_reg + index as u16) as usize];
+                    self.regs.v_regs[index as usize] =
+                        self.ram.0[(self.regs.i_reg + index as u16) as usize];
                 }
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::TwoArg(TwoArg::SkipEqVxVy(arg)) => {
                 if self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                    == self.regs.v_regs[arg.y().to_usize().expect("Check usize")]
+                    == self.regs.v_regs
+                        [arg.y().to_usize().expect("Check usize")]
                 {
                     self.regs.pc.update();
                 }
@@ -440,7 +456,8 @@ impl Chip8 {
                 let (x, flag) = self.regs.v_regs
                     [arg.x().to_usize().expect("Check usize")]
                     .overflowing_add(
-                        self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                        self.regs.v_regs
+                            [arg.y().to_usize().expect("Check usize")],
                     );
                 self.regs.v_regs[FLAG_REG] = flag as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
@@ -451,7 +468,8 @@ impl Chip8 {
                 let (x, flag) = self.regs.v_regs
                     [arg.x().to_usize().expect("Check usize")]
                     .overflowing_sub(
-                        self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                        self.regs.v_regs
+                            [arg.y().to_usize().expect("Check usize")],
                     );
                 self.regs.v_regs[FLAG_REG] = (!flag) as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
@@ -461,9 +479,11 @@ impl Chip8 {
             Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
                 self.regs.v_regs[FLAG_REG] = (0b00000001
                     & self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                    == 0b00000001) as u8;
+                    == 0b00000001)
+                    as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] =
-                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")] >> 1;
+                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                        >> 1;
                 self.regs.pc.update();
                 Ok(())
             }
@@ -471,7 +491,8 @@ impl Chip8 {
                 let (y, flag) = self.regs.v_regs
                     [arg.y().to_usize().expect("Check usize")]
                     .overflowing_sub(
-                        self.regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                        self.regs.v_regs
+                            [arg.x().to_usize().expect("Check usize")],
                     );
                 self.regs.v_regs[FLAG_REG] = (!flag) as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = y;
@@ -480,16 +501,19 @@ impl Chip8 {
             }
             Opcode::TwoArg(TwoArg::ShiftVxL(arg)) => {
                 self.regs.v_regs[FLAG_REG] = (0b10000000
-                    & self.regs.v_regs[arg.x().to_usize().expect("Check usize")])
+                    & self.regs.v_regs
+                        [arg.x().to_usize().expect("Check usize")])
                     >> 7 as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] =
-                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")] << 1;
+                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                        << 1;
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::TwoArg(TwoArg::SkipVxNEqVy(arg)) => {
                 if self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
-                    != self.regs.v_regs[arg.y().to_usize().expect("Check usize")]
+                    != self.regs.v_regs
+                        [arg.y().to_usize().expect("Check usize")]
                 {
                     self.regs.pc.update();
                 }
@@ -535,16 +559,17 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::ThreeArg(ThreeArg::SetVxKK(arg)) => {
-                self.regs.v_regs[arg.x().to_usize().expect("Check usize") as usize] =
+                self.regs.v_regs
+                    [arg.x().to_usize().expect("Check usize") as usize] =
                     arg.get_byte();
                 self.regs.pc.update();
                 Ok(())
             }
             Opcode::ThreeArg(ThreeArg::VxEqVxPlusKK(arg)) => {
-                self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = self.regs.v_regs
-                    [arg.x().to_usize().expect("Check usize")]
-                    .overflowing_add(arg.get_byte())
-                    .0;
+                self.regs.v_regs[arg.x().to_usize().expect("Check usize")] =
+                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                        .overflowing_add(arg.get_byte())
+                        .0;
                 self.regs.pc.update();
                 Ok(())
             }
@@ -554,7 +579,8 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::ThreeArg(ThreeArg::PCEqNNNPlusV0(arg)) => {
-                let sum = (self.regs.v_regs[0] as usize) + arg.to_addr() as usize;
+                let sum =
+                    (self.regs.v_regs[0] as usize) + arg.to_addr() as usize;
                 if sum > 0xffe || sum < 0x200 {
                     return Err(InvalidOpcode::OutOfBoundsAddress(
                         "Out of bounds program counter".to_string(),
@@ -570,7 +596,8 @@ impl Chip8 {
                 self.regs.pc.update();
                 Ok(())
             }
-            Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match self.screen
+            Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match self
+                .screen
                 .draw_nybble(
                     self.regs.v_regs[arg.x().to_usize().expect("Check usize")],
                     self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
@@ -608,7 +635,10 @@ impl Chip8 {
 
             for _ in 0..num_inst {
                 if self.keyboard.wait_press == None {
-                    let op = Opcode::decode_op(fetch_opcode(&self.regs.pc, &self.ram))?;
+                    let op = Opcode::decode_op(fetch_opcode(
+                        &self.regs.pc,
+                        &self.ram,
+                    ))?;
                     match self.execute(op, true) {
                         Ok(_) => (),
                         Err(err) => return Err(err),
@@ -627,7 +657,6 @@ fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
     let r_byte: u8 = ram.0[(pc.get_addr() + 1) as usize];
     ((l_byte as u16) << 8) | (r_byte as u16)
 }
-
 
 fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) -> Result<(), String> {
     match v_reg {

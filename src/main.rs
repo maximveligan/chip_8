@@ -8,19 +8,21 @@ use piston_window::*;
 use chip8::Chip8;
 use std::env;
 
+mod chip8;
 mod nybble;
 mod opcode;
-mod chip8;
 
 const PIXEL_SIZE: f64 = 10.0;
 
 fn main() {
     let mut chip8 = match env::args().nth(1) {
-        Some(path) => 
-            match Chip8::new(&path) {
-                Ok(chip) => chip,
-                Err(e) => {println!("{}", e); return;},
+        Some(path) => match Chip8::new(&path) {
+            Ok(chip) => chip,
+            Err(e) => {
+                println!("{}", e);
+                return;
             }
+        },
 
         _ => {
             println!("Didn't recieve a rom");
@@ -80,10 +82,7 @@ fn main() {
 
         if let Some(up_args) = e.update_args() {
             if !pause {
-                match chip8.emulate_cycles(
-                    up_args.dt,
-                    clock_speed,
-                ) {
+                match chip8.emulate_cycles(up_args.dt, clock_speed) {
                     Ok(_) => (),
                     Err(err) => {
                         println!("{:?}", err);
@@ -111,10 +110,7 @@ fn main() {
                             Key::P => pause = !pause,
                             Key::M => {
                                 if pause {
-                                    match chip8.emulate_cycles(
-                                        1.0,
-                                        1.0,
-                                    ) {
+                                    match chip8.emulate_cycles(1.0, 1.0) {
                                         Ok(()) => (),
                                         Err(e) => {
                                             println!("{:?}", e);
