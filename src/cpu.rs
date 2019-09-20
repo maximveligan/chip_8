@@ -1,4 +1,3 @@
-extern crate rand;
 use nybble::Nybble;
 use opcode::Opcode;
 use opcode::InvalidOpcode;
@@ -6,10 +5,10 @@ use opcode::NoArg;
 use opcode::OneArg;
 use opcode::TwoArg;
 use opcode::ThreeArg;
+use screen::Screen;
+use keyboard::Keyboard;
 use std::fmt;
 use num::ToPrimitive;
-use std::fs::File;
-use std::io::prelude::*;
 
 const SPR_ZERO_START: u16 = 0000;
 const SPR_ONE_START: u16 = 0005;
@@ -46,269 +45,37 @@ const SPR_E: [u8; 5] = [0xF0, 0x80, 0xF0, 0x80, 0xF0];
 const SPR_F: [u8; 5] = [0xF0, 0x80, 0xF0, 0x80, 0x80];
 
 const FLAG_REG: usize = 0xF;
-const SCREEN_WIDTH: usize = 64;
-const SCREEN_HEIGHT: usize = 32;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Registers {
-    pc: ProgramCounter,
-    delay: u8,
-    sound: u8,
-    sp: u8,
-    i_reg: u16,
-    pub v_regs: [u8; 16],
-}
-
-impl Registers {
-    fn new() -> Registers {
-        let chip_8_adrr = 0x200;
-        Registers {
-            pc: ProgramCounter(chip_8_adrr),
-            delay: 0,
-            sound: 0,
-            i_reg: 0,
-            sp: 0,
-            v_regs: [0; 16],
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-struct Ram([u8; 0xFFF]);
-
-impl fmt::Debug for Ram {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut ram_string = "".to_string();
-        for index in 0..0xFFF {
-            if index % 64 == 0 {
-                ram_string.push_str("\n");
-            }
-            ram_string.push_str(&self.0[index].to_string());
-        }
-        write!(f, "Ram Dump\n{}", ram_string)
-    }
-}
-
-impl Ram {
-    fn initialize_ram(path: &str) -> Result<Ram, String> {
-        let mut ram = Ram { 0: [0; 0xFFF] };
-        ram.load_digit_data();
-        match ram.load_rom(path) {
-            Ok(_) => Ok(ram),
-            Err(err) => Err(err),
-        }
-    }
-
-    fn load_digit_data(&mut self) {
-        self.0[0000..0005].copy_from_slice(&SPR_ZERO);
-        self.0[0005..0010].copy_from_slice(&SPR_ONE);
-        self.0[0010..0015].copy_from_slice(&SPR_TWO);
-        self.0[0015..0020].copy_from_slice(&SPR_THREE);
-        self.0[0020..0025].copy_from_slice(&SPR_FOUR);
-        self.0[0025..0030].copy_from_slice(&SPR_FIVE);
-        self.0[0030..0035].copy_from_slice(&SPR_SIX);
-        self.0[0035..0040].copy_from_slice(&SPR_SEVEN);
-        self.0[0040..0045].copy_from_slice(&SPR_EIGHT);
-        self.0[0045..0050].copy_from_slice(&SPR_NINE);
-        self.0[0050..0055].copy_from_slice(&SPR_A);
-        self.0[0055..0060].copy_from_slice(&SPR_B);
-        self.0[0060..0065].copy_from_slice(&SPR_C);
-        self.0[0065..0070].copy_from_slice(&SPR_D);
-        self.0[0070..0075].copy_from_slice(&SPR_E);
-        self.0[0075..0080].copy_from_slice(&SPR_F);
-    }
-
-    fn retrieve_bytes(self, index: u16, amount: Nybble) -> Vec<u8> {
-        let mut byte_vec = Vec::new();
-        for i in index as usize
-            ..(index as usize + amount.to_usize().expect("Check usize"))
-        {
-            byte_vec.push(self.0[i]);
-        }
-        byte_vec
-    }
-
-    fn load_rom(&mut self, file: &str) -> Result<(), String> {
-        match File::open(file) {
-            Ok(mut rom) => {
-                let mut raw_bytes = Vec::new();
-                rom.read_to_end(&mut raw_bytes)
-                    .expect("Something went wrong while reading the rom");
-                self.0[0x200..0x200 + raw_bytes.len()]
-                    .copy_from_slice(&raw_bytes);
-                Ok(())
-            }
-            Err(e) => Err(format!("No such file: {0}. {1}", file, e)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ProgramCounter(u16);
-
-impl ProgramCounter {
-    fn update(&mut self) {
-        self.0 += 2;
-    }
-    fn set_addr(&mut self, addr: u16) {
-        self.0 = addr;
-    }
-    fn get_addr(&self) -> u16 {
-        self.0
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Stack([u16; 16]);
-
-impl Stack {
-    fn new() -> Stack {
-        Stack { 0: [0; 16] }
-    }
-    fn push(&mut self, sp: &mut u8, pc: &ProgramCounter) -> Result<(), String> {
-        *sp = *sp + 1;
-        if *sp > 15 {
-            return Err("Stack overflow".to_string());
-        }
-        self.0[*sp as usize] = pc.get_addr();
-        Ok(())
-    }
-
-    fn pop(&self, sp: &mut u8) -> Result<ProgramCounter, String> {
-        let temp = ProgramCounter(self.0[*sp as usize]);
-        if *sp <= 0 {
-            return Err("Stack pointer cannot go below 0".to_string());
-        }
-        *sp = *sp - 1;
-        Ok(temp)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct Screen {
-    pub buffer: [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT],
-    pub height: usize,
-    pub width: usize,
-}
-
-impl fmt::Debug for Screen {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut screen_string = "".to_string();
-        for y in 0..SCREEN_HEIGHT {
-            for x in 0..SCREEN_WIDTH {
-                if self.buffer[y][x] {
-                    screen_string.push_str("*");
-                } else {
-                    screen_string.push_str(" ");
-                }
-            }
-            screen_string.push_str("\n");
-        }
-        write!(f, "{}", screen_string)
-    }
-}
-
-impl Screen {
-    fn new() -> Screen {
-        Screen {
-            buffer: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT],
-            height: SCREEN_HEIGHT,
-            width: SCREEN_WIDTH,
-        }
-    }
-
-    fn draw_nybble(
-        &mut self,
-        x: u8,
-        y: u8,
-        ram_index: u16,
-        num_bytes: Nybble,
-        collision_flag: &mut u8,
-        ram: &Ram,
-    ) -> Result<(), String> {
-        if x > (SCREEN_WIDTH as u8) || y > (SCREEN_HEIGHT as u8) {
-            return Err(format!("Out of screen bounds: {0}, {1}", x, y));
-        }
-        let sprite = ram.retrieve_bytes(ram_index, num_bytes);
-        *collision_flag = 0;
-        for byte_num in 0..sprite.len() {
-            for bit in 0..8 {
-                let pixel_val = get_bit(sprite[byte_num], bit)
-                    .expect("Iterator went over 8");
-                let y_cord = Some((y as usize + byte_num) % (SCREEN_HEIGHT));
-                let x_cord = Some((x + bit) as usize % (SCREEN_WIDTH));
-                *collision_flag |= (pixel_val
-                    & self.buffer[y_cord.expect("Should've gotten an x value")]
-                        [x_cord.expect("Should've gotten a y value")])
-                    as u8;
-
-                self.buffer[y_cord.expect("Should've gotten an x value")]
-                    [x_cord.expect("Should've gotten a y value")] ^= pixel_val
-            }
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Keyboard {
-    key_buffer: [bool; 0xF + 1],
-    wait_press: Option<u8>,
-}
-
-impl Keyboard {
-    fn new() -> Keyboard {
-        Keyboard {
-            key_buffer: [false; 0xF + 1],
-            wait_press: None,
-        }
-    }
-
-    pub fn press_key(&mut self, key: usize, vreg: &mut [u8; 16]) {
-        self.key_buffer[key] = true;
-        if self.wait_press != None {
-            vreg[self.wait_press.unwrap() as usize] = key as u8;
-            self.wait_press = None;
-        }
-    }
-
-    pub fn release_key(&mut self, key: usize) {
-        self.key_buffer[key] = false;
-    }
-}
-
-pub struct Chip8 {
+pub struct Cpu {
     pub regs: Registers,
-    ram: Ram,
-    stack: Stack,
+    pub ram: Ram,
+    pub stack: Stack,
     pub screen: Screen,
     pub keyboard: Keyboard,
 }
 
-impl Chip8 {
-    pub fn new(rom_path: &str) -> Result<Chip8, String> {
-        Ok(Chip8 {
-            ram: match Ram::initialize_ram(&rom_path) {
-                Ok(r) => r,
-                Err(e) => return Err(e),
-            },
+impl Cpu {
+    pub fn new(bytes: &[u8]) -> Cpu {
+        Cpu {
             regs: Registers::new(),
+            ram: Ram::initialize_ram(bytes),
             stack: Stack::new(),
-            screen: Screen::new(),
             keyboard: Keyboard::new(),
-        })
+            screen: Screen::new(),
+        }
     }
 
-    fn execute(
-        &mut self,
-        opcode: Opcode,
-        debug: bool,
-    ) -> Result<(), InvalidOpcode> {
-        if debug {
-            println!("{:?}", opcode);
-        }
-        match opcode {
+    fn fetch_opcode(&self) -> u16 {
+        let l_byte: u8 = self.ram.0[self.regs.pc.get_addr() as usize];
+        let r_byte: u8 = self.ram.0[(self.regs.pc.get_addr() + 1) as usize];
+        ((l_byte as u16) << 8) | (r_byte as u16)
+    }
+
+    pub fn step(&mut self) -> Result<(), InvalidOpcode> {
+        self.execute(Opcode::decode_op(self.fetch_opcode())?)
+    }
+
+    fn execute(&mut self, op: Opcode) -> Result<(), InvalidOpcode> {
+        match op {
             Opcode::NoArg(NoArg::ClearScreen) => {
                 self.screen.buffer.iter_mut().for_each(|inner_array| {
                     inner_array.iter_mut().for_each(|pixel| *pixel = false)
@@ -323,16 +90,14 @@ impl Chip8 {
                         self.regs.pc.update();
                         Ok(())
                     }
-                    Err(err) => Err(InvalidOpcode::StackUnderflow(err, opcode)),
+                    Err(err) => Err(InvalidOpcode::StackUnderflow(err, op)),
                 }
             }
 
             Opcode::OneArg(OneArg::SkipIfVx(arg)) => {
-                if self.keyboard.key_buffer[self.regs.v_regs[arg
-                                                                 .to_usize()
-                                                                 .expect(
-                    "Check usize",
-                )] as usize]
+                if self.keyboard.key_buffer[self.regs.v_regs
+                    [arg.to_usize().expect("Check usize")]
+                    as usize]
                 {
                     self.regs.pc.update();
                 }
@@ -340,11 +105,9 @@ impl Chip8 {
                 Ok(())
             }
             Opcode::OneArg(OneArg::SkipIfNVx(arg)) => {
-                if !self.keyboard.key_buffer[self.regs.v_regs[arg
-                                                                  .to_usize()
-                                                                  .expect(
-                    "Check usize",
-                )] as usize]
+                if !self.keyboard.key_buffer[self.regs.v_regs
+                    [arg.to_usize().expect("Check usize")]
+                    as usize]
                 {
                     self.regs.pc.update();
                 }
@@ -390,7 +153,7 @@ impl Chip8 {
                     self.regs.pc.update();
                     Ok(())
                 }
-                Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(err, opcode)),
+                Err(err) => Err(InvalidOpcode::NoSuchDigitSprite(err, op)),
             },
             Opcode::OneArg(OneArg::StoreDecVx(arg)) => {
                 let tmp =
@@ -455,10 +218,9 @@ impl Chip8 {
             Opcode::TwoArg(TwoArg::VxPlusEqVySetF(arg)) => {
                 let (x, flag) = self.regs.v_regs
                     [arg.x().to_usize().expect("Check usize")]
-                    .overflowing_add(
-                        self.regs.v_regs
-                            [arg.y().to_usize().expect("Check usize")],
-                    );
+                .overflowing_add(
+                    self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                );
                 self.regs.v_regs[FLAG_REG] = flag as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
                 self.regs.pc.update();
@@ -467,10 +229,9 @@ impl Chip8 {
             Opcode::TwoArg(TwoArg::VxSubEqVySetF(arg)) => {
                 let (x, flag) = self.regs.v_regs
                     [arg.x().to_usize().expect("Check usize")]
-                    .overflowing_sub(
-                        self.regs.v_regs
-                            [arg.y().to_usize().expect("Check usize")],
-                    );
+                .overflowing_sub(
+                    self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
+                );
                 self.regs.v_regs[FLAG_REG] = (!flag) as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = x;
                 self.regs.pc.update();
@@ -478,7 +239,8 @@ impl Chip8 {
             }
             Opcode::TwoArg(TwoArg::ShiftVxR(arg)) => {
                 self.regs.v_regs[FLAG_REG] = (0b00000001
-                    & self.regs.v_regs[arg.x().to_usize().expect("Check usize")]
+                    & self.regs.v_regs
+                        [arg.x().to_usize().expect("Check usize")]
                     == 0b00000001)
                     as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] =
@@ -490,10 +252,9 @@ impl Chip8 {
             Opcode::TwoArg(TwoArg::VxEqVySubVxSetF(arg)) => {
                 let (y, flag) = self.regs.v_regs
                     [arg.y().to_usize().expect("Check usize")]
-                    .overflowing_sub(
-                        self.regs.v_regs
-                            [arg.x().to_usize().expect("Check usize")],
-                    );
+                .overflowing_sub(
+                    self.regs.v_regs[arg.x().to_usize().expect("Check usize")],
+                );
                 self.regs.v_regs[FLAG_REG] = (!flag) as u8;
                 self.regs.v_regs[arg.x().to_usize().expect("Check usize")] = y;
                 self.regs.pc.update();
@@ -535,7 +296,7 @@ impl Chip8 {
                         self.regs.pc.set_addr(arg.to_addr());
                         Ok(())
                     }
-                    Err(err) => Err(InvalidOpcode::StackOverflow(err, opcode)),
+                    Err(err) => Err(InvalidOpcode::StackOverflow(err, op)),
                 }
             }
             Opcode::ThreeArg(ThreeArg::SkipVxEqKK(arg)) => {
@@ -584,7 +345,7 @@ impl Chip8 {
                 if sum > 0xffe || sum < 0x200 {
                     return Err(InvalidOpcode::OutOfBoundsAddress(
                         "Out of bounds program counter".to_string(),
-                        opcode,
+                        op,
                     ));
                 }
                 self.regs.pc.set_addr(sum as u16);
@@ -596,9 +357,8 @@ impl Chip8 {
                 self.regs.pc.update();
                 Ok(())
             }
-            Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => match self
-                .screen
-                .draw_nybble(
+            Opcode::ThreeArg(ThreeArg::DrawVxVyNib(arg)) => {
+                match self.screen.draw_nybble(
                     self.regs.v_regs[arg.x().to_usize().expect("Check usize")],
                     self.regs.v_regs[arg.y().to_usize().expect("Check usize")],
                     self.regs.i_reg,
@@ -606,56 +366,131 @@ impl Chip8 {
                     &mut self.regs.v_regs[FLAG_REG],
                     &mut self.ram,
                 ) {
-                Ok(_) => {
-                    self.regs.pc.update();
-                    Ok(())
-                }
-                Err(err) => Err(InvalidOpcode::OutOfScreenBounds(err, opcode)),
-            },
-        }
-    }
-
-    pub fn emulate_cycles(
-        &mut self,
-        dt: f64,
-        clock_speed: f64,
-    ) -> Result<(), InvalidOpcode> {
-        if self.keyboard.wait_press == None {
-            if self.regs.delay != 0 {
-                self.regs.delay -= 1;
-            }
-            if self.regs.sound != 0 {
-                self.regs.sound -= 1;
-            }
-            let mut num_inst = (dt * clock_speed).round() as usize;
-
-            if num_inst <= 1 {
-                num_inst = 1;
-            }
-
-            for _ in 0..num_inst {
-                if self.keyboard.wait_press == None {
-                    let op = Opcode::decode_op(fetch_opcode(
-                        &self.regs.pc,
-                        &self.ram,
-                    ))?;
-                    match self.execute(op, true) {
-                        Ok(_) => (),
-                        Err(err) => return Err(err),
-                    };
+                    Ok(_) => {
+                        self.regs.pc.update();
+                        Ok(())
+                    }
+                    Err(err) => Err(InvalidOpcode::OutOfScreenBounds(err, op)),
                 }
             }
-            Ok(())
-        } else {
-            Ok(())
         }
     }
 }
 
-fn fetch_opcode(pc: &ProgramCounter, ram: &Ram) -> u16 {
-    let l_byte: u8 = ram.0[pc.get_addr() as usize];
-    let r_byte: u8 = ram.0[(pc.get_addr() + 1) as usize];
-    ((l_byte as u16) << 8) | (r_byte as u16)
+#[derive(Debug, Clone, Copy)]
+pub struct Registers {
+    pc: ProgramCounter,
+    pub delay: u8,
+    pub sound: u8,
+    sp: u8,
+    i_reg: u16,
+    pub v_regs: [u8; 16],
+}
+
+impl Registers {
+    fn new() -> Registers {
+        let chip_8_adrr = 0x200;
+        Registers {
+            pc: ProgramCounter(chip_8_adrr),
+            delay: 0,
+            sound: 0,
+            i_reg: 0,
+            sp: 0,
+            v_regs: [0; 16],
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Ram(Box<[u8]>);
+
+impl fmt::Debug for Ram {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut ram_string = "".to_string();
+        for index in 0..0xFFF {
+            if index % 64 == 0 {
+                ram_string.push_str("\n");
+            }
+            ram_string.push_str(&self.0[index].to_string());
+        }
+        write!(f, "Ram Dump\n{}", ram_string)
+    }
+}
+
+impl Ram {
+    pub fn initialize_ram(bytes: &[u8]) -> Ram {
+        let mut ram = Ram {
+            0: Box::new([0; 0xFFF]),
+        };
+        ram.load_digit_data();
+        ram.0[0x200..0x200 + bytes.len()].copy_from_slice(bytes);
+        ram
+    }
+
+    fn load_digit_data(&mut self) {
+        self.0[0000..0005].copy_from_slice(&SPR_ZERO);
+        self.0[0005..0010].copy_from_slice(&SPR_ONE);
+        self.0[0010..0015].copy_from_slice(&SPR_TWO);
+        self.0[0015..0020].copy_from_slice(&SPR_THREE);
+        self.0[0020..0025].copy_from_slice(&SPR_FOUR);
+        self.0[0025..0030].copy_from_slice(&SPR_FIVE);
+        self.0[0030..0035].copy_from_slice(&SPR_SIX);
+        self.0[0035..0040].copy_from_slice(&SPR_SEVEN);
+        self.0[0040..0045].copy_from_slice(&SPR_EIGHT);
+        self.0[0045..0050].copy_from_slice(&SPR_NINE);
+        self.0[0050..0055].copy_from_slice(&SPR_A);
+        self.0[0055..0060].copy_from_slice(&SPR_B);
+        self.0[0060..0065].copy_from_slice(&SPR_C);
+        self.0[0065..0070].copy_from_slice(&SPR_D);
+        self.0[0070..0075].copy_from_slice(&SPR_E);
+        self.0[0075..0080].copy_from_slice(&SPR_F);
+    }
+
+    pub fn retrieve_bytes(&self, index: u16, amount: Nybble) -> &[u8] {
+        &self.0[index as usize
+            ..(index as usize) + amount.to_usize().expect("Can't fail")]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProgramCounter(u16);
+
+impl ProgramCounter {
+    fn update(&mut self) {
+        self.0 += 2;
+    }
+    fn set_addr(&mut self, addr: u16) {
+        self.0 = addr;
+    }
+    fn get_addr(&self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Stack([u16; 16]);
+
+impl Stack {
+    fn new() -> Stack {
+        Stack { 0: [0; 16] }
+    }
+    fn push(&mut self, sp: &mut u8, pc: &ProgramCounter) -> Result<(), String> {
+        *sp = *sp + 1;
+        if *sp > 15 {
+            return Err("Stack overflow".to_string());
+        }
+        self.0[*sp as usize] = pc.get_addr();
+        Ok(())
+    }
+
+    fn pop(&self, sp: &mut u8) -> Result<ProgramCounter, String> {
+        let temp = ProgramCounter(self.0[*sp as usize]);
+        if *sp <= 0 {
+            return Err("Stack pointer cannot go below 0".to_string());
+        }
+        *sp = *sp - 1;
+        Ok(temp)
+    }
 }
 
 fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) -> Result<(), String> {
@@ -678,14 +513,4 @@ fn i_eq_spr_digit_vx(v_reg: u8, i_reg: &mut u16) -> Result<(), String> {
         0xf => Ok(*i_reg = SPR_F_START),
         _ => Err(format!("Value {} is not a valid digit sprite!", v_reg)),
     }
-}
-
-// Note, this will return error if you attempt to pass in a value over 7, as it
-// is "out of bounds" for indexing a u8.
-
-fn get_bit(n: u8, b: u8) -> Result<bool, String> {
-    if b > 7 {
-        return Err(format!("Attempted to pass in a val greater than 7 {}", b));
-    }
-    Ok((n >> (7 - b)) & 1 == 1)
 }

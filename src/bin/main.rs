@@ -1,34 +1,22 @@
+extern crate chip_8;
 extern crate num;
 extern crate piston_window;
-use piston_window::WindowSettings;
-use piston_window::PistonWindow;
-use piston_window::RenderEvent;
-use piston_window::PressEvent;
 use piston_window::*;
-use chip8::Chip8;
 use std::env;
+use chip_8::Chip8;
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 
-mod chip8;
-mod nybble;
-mod opcode;
+const PIXEL_SIZE: f64 = 5.0;
 
-const PIXEL_SIZE: f64 = 10.0;
+fn main() -> Result<(), Box<dyn Error>> {
+    let path: &str = &env::args().nth(1).ok_or("Did not get a rom")?;
+    let mut raw_bytes = Vec::new();
+    let mut raw_rom = File::open(path)?;
+    raw_rom.read_to_end(&mut raw_bytes)?;
 
-fn main() {
-    let mut chip8 = match env::args().nth(1) {
-        Some(path) => match Chip8::new(&path) {
-            Ok(chip) => chip,
-            Err(e) => {
-                println!("{}", e);
-                return;
-            }
-        },
-
-        _ => {
-            println!("Didn't recieve a rom");
-            return;
-        }
-    };
+    let mut chip8 = Chip8::new(&raw_bytes);
 
     let mut clock_speed: f64 = 540.0;
     let mut pause: bool = false;
@@ -36,21 +24,22 @@ fn main() {
     let mut window: PistonWindow = WindowSettings::new(
         "Rust-8 Emulator",
         [
-            (chip8.screen.width * PIXEL_SIZE as usize) as u32,
-            (chip8.screen.height * PIXEL_SIZE as usize) as u32,
+            (chip8.cpu.screen.width * PIXEL_SIZE as usize) as u32,
+            (chip8.cpu.screen.height * PIXEL_SIZE as usize) as u32,
         ],
-    ).exit_on_esc(true)
-        .build()
-        .unwrap();
+    )
+    .exit_on_esc(true)
+    .build()
+    .unwrap();
     window.set_ups(60);
 
     while let Some(e) = window.next() {
         if let Some(_) = e.render_args() {
             window.draw_2d(&e, |c, g| {
                 clear([0.5, 0.5, 0.5, 1.0], g);
-                for y in 0..chip8.screen.height {
-                    for x in 0..chip8.screen.width {
-                        if chip8.screen.buffer[y][x] {
+                for y in 0..chip8.cpu.screen.height {
+                    for x in 0..chip8.cpu.screen.width {
+                        if chip8.cpu.screen.buffer[y][x] {
                             rectangle(
                                 [1.0, 1.0, 1.0, 1.0],
                                 [
@@ -82,13 +71,7 @@ fn main() {
 
         if let Some(up_args) = e.update_args() {
             if !pause {
-                match chip8.emulate_cycles(up_args.dt, clock_speed) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        println!("{:?}", err);
-                        return ();
-                    }
-                }
+                chip8.emulate_cycles(up_args.dt, clock_speed)?
             }
         }
 
@@ -96,7 +79,10 @@ fn main() {
             match k {
                 Button::Keyboard(input) => {
                     if let Some(input) = key_to_usize(input) {
-                        chip8.keyboard.press_key(input, &mut chip8.regs.v_regs)
+                        chip8
+                            .cpu
+                            .keyboard
+                            .press_key(input, &mut chip8.cpu.regs.v_regs)
                     } else {
                         match input {
                             Key::LeftBracket => {
@@ -110,13 +96,7 @@ fn main() {
                             Key::P => pause = !pause,
                             Key::M => {
                                 if pause {
-                                    match chip8.emulate_cycles(1.0, 1.0) {
-                                        Ok(()) => (),
-                                        Err(e) => {
-                                            println!("{:?}", e);
-                                            return;
-                                        }
-                                    }
+                                    chip8.emulate_cycles(1.0, 1.0)?;
                                 };
                             }
                             _ => (),
@@ -131,13 +111,14 @@ fn main() {
             match k {
                 Button::Keyboard(input) => {
                     if let Some(key) = key_to_usize(input) {
-                        chip8.keyboard.release_key(key);
+                        chip8.cpu.keyboard.release_key(key);
                     }
                 }
                 _ => (),
             }
         }
     }
+    Ok(())
 }
 
 fn key_to_usize(key: Key) -> Option<usize> {

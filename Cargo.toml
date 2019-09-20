@@ -3,6 +3,10 @@ name = "chip_8"
 version = "0.1.0"
 authors = ["Maxim <maximveligan@gmail.com>"]
 
+[lib]
+name = "chip_8"
+path = "src/lib.rs"
+
 [dependencies]
 rand = "*"
 num = "*"

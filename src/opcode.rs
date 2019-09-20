@@ -203,6 +203,14 @@ pub enum InvalidOpcode {
     OutOfScreenBounds(String, Opcode),
 }
 
+impl std::error::Error for InvalidOpcode {}
+
+impl std::fmt::Display for InvalidOpcode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "kek")
+    }
+}
+
 impl Opcode {
     pub fn decode_op(op: u16) -> Result<Opcode, InvalidOpcode> {
         match op {
