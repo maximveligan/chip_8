@@ -1,0 +1,11 @@
+[package]
+name = "chip8_frontend"
+version = "0.1.0"
+authors = ["maximveligan <maximveligan@gmail.com>"]
+
+[dependencies]
+chip8 = { path = "../chip8_emu" }
+serde = { version = "*", features = ["derive"] }
+sdl2 = "*"
+toml = "*"
+bincode = "*"

@@ -5,9 +5,9 @@ use cpu::Ram;
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Screen {
-    pub buffer: [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT],
+    pub buffer: Box<[[bool; SCREEN_WIDTH]; SCREEN_HEIGHT]>,
     pub height: usize,
     pub width: usize,
 }
@@ -32,7 +32,7 @@ impl fmt::Debug for Screen {
 impl Screen {
     pub fn new() -> Screen {
         Screen {
-            buffer: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT],
+            buffer: Box::new([[false; SCREEN_WIDTH]; SCREEN_HEIGHT]),
             height: SCREEN_HEIGHT,
             width: SCREEN_WIDTH,
         }

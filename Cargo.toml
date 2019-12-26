@@ -1,14 +1,3 @@
-[package]
-name = "chip_8"
-version = "0.1.0"
-authors = ["Maxim <maximveligan@gmail.com>"]
+[workspace]
 
-[lib]
-name = "chip_8"
-path = "src/lib.rs"
-
-[dependencies]
-rand = "*"
-num = "*"
-piston_window = "*"
-find_folder = "*"
+members = ["chip8_front_end", "chip8_emu"]
