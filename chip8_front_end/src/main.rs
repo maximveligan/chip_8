@@ -9,13 +9,24 @@ use sdl2::keyboard::Keycode;
 use sdl2::render::TextureAccess;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::event::Event;
-// use std::time::{Duration, Instant};
+use std::time::{Duration, Instant};
+use std::thread::sleep;
 
-const PIXEL_SIZE: usize = 5;
-// const FRAME_RATE: f64 = 60.0; // Measured in frames per second
+const SCREEN_WIDTH: usize = 64;
+const SCREEN_HEIGHT: usize = 32;
+const SCREEN_SIZE: usize = SCREEN_WIDTH * SCREEN_HEIGHT * 3;
+
+const PIXEL_SIZE: usize = 10;
+const FRAME_RATE: f64 = 60.0; // Measured in frames per second
 
 fn handle_event(event: Event, emu: &mut Chip8) -> bool {
     match event {
+        Event::Quit { .. }
+            | Event::KeyDown {
+                keycode: Some(Keycode::Escape),
+                ..
+        } => { true }
+
         Event::KeyDown {
             keycode: Some(key), ..
         } => {
@@ -68,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut chip8 = Chip8::new(&raw_bytes);
 
-    // let mut clock_speed: f64 = 540.0;
+    let clock_speed: f64 = 540.0;
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -76,8 +87,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let window = video_subsystem
         .window(
             "Res",
-            (chip8.cpu.screen.width * PIXEL_SIZE) as u32,
-            (chip8.cpu.screen.height * PIXEL_SIZE) as u32,
+            (SCREEN_WIDTH * PIXEL_SIZE) as u32,
+            (SCREEN_HEIGHT * PIXEL_SIZE) as u32,
         )
         .position_centered()
         .build()
@@ -95,20 +106,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         .create_texture(
             PixelFormatEnum::RGB24,
             TextureAccess::Streaming,
-            chip8.cpu.screen.width as u32,
-            chip8.cpu.screen.height as u32,
+            SCREEN_WIDTH as u32,
+            SCREEN_HEIGHT as u32,
         )
         .unwrap();
+
     let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut framebuffer = Box::new([0; 64 * 32 * 3]);
+    let mut framebuffer = Box::new([0; SCREEN_SIZE]);
 
     loop {
-        // let clocks_per_frame = clock_speed / FRAME_RATE;
-        // let now = Instant::now();
+        let clocks_per_frame = (clock_speed / FRAME_RATE) as usize;
+        let sleep_time = ((1.0 / FRAME_RATE) * 1000000.0) as u64; // multiply by 1000000 to convert to ns
+        let now = Instant::now();
 
-        for y in 0..chip8.cpu.screen.height {
-            for x in 0..chip8.cpu.screen.width {
-                let index = ((y * 64) + x) * 3;
+        for y in 0..SCREEN_HEIGHT {
+            for x in 0..SCREEN_WIDTH {
+                let index = ((y * SCREEN_WIDTH) + x) * 3;
                 let c = if chip8.cpu.screen.buffer[y][x] { 255 } else { 0 };
                 framebuffer[index] = c;
                 framebuffer[index + 1] = c;
@@ -116,17 +129,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        texture.update(None, &(*framebuffer), 64 * 32 * 3).unwrap();
-        canvas.clear();
-        canvas.copy(&texture, None, None).unwrap();
-        canvas.present();
-        
-        for _ in 0..540 {
+        for _ in 0..clocks_per_frame {
             chip8.run_cycle()?
         }
 
         for event in event_pump.poll_iter() {
-            handle_event(event, &mut chip8);
+            if handle_event(event, &mut chip8) {
+                return Ok(());
+            }
         }
+
+        texture.update(None, &(*framebuffer), SCREEN_WIDTH * 3).unwrap();
+        canvas.clear();
+        canvas.copy(&texture, None, None).unwrap();
+        canvas.present();
+
+        sleep(now.elapsed() - Duration::from_nanos(sleep_time));
     }
 }
